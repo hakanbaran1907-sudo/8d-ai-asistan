@@ -1810,62 +1810,164 @@
                                 </div>
                             </div>
 
-                            <div class="mb-8">
-                                <h2 class="text-2xl font-black text-slate-900 tracking-tight">Hoş geldiniz</h2>
-                                <p class="text-slate-400 mt-1.5 text-sm">Devam etmek için giriş yapın</p>
+                            <!-- ===== LOGIN FORM ===== -->
+                            <div id="login-form-panel">
+                                <div class="mb-8">
+                                    <h2 class="text-2xl font-black text-slate-900 tracking-tight">Hoş geldiniz</h2>
+                                    <p class="text-slate-400 mt-1.5 text-sm">Devam etmek için giriş yapın</p>
+                                </div>
+
+                                <div class="space-y-5">
+                                    <!-- Firma Seçimi -->
+                                    <div>
+                                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Firma</label>
+                                        <select id="login-company-selector"
+                                            class="w-full px-4 py-3.5 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all hover:border-slate-300 cursor-pointer appearance-none"
+                                            style="background-image: url('data:image/svg+xml;charset=UTF-8,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%2394a3b8%22 stroke-width=%222%22%3E%3Cpath d=%22M6 9l6 6 6-6%22/%3E%3C/svg%3E'); background-repeat: no-repeat; background-position: right 12px center; background-size: 18px;">
+                                            ${this.companies.map(c => `<option value="${c.id}">${c.name}</option>`).join('')}
+                                        </select>
+                                    </div>
+
+                                    <!-- Kullanıcı Adı -->
+                                    <div>
+                                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Kullanıcı Adı</label>
+                                        <div class="relative group">
+                                            <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-primary transition-colors">
+                                                <i class="fa-solid fa-user text-sm"></i>
+                                            </span>
+                                            <input type="text" id="login-username"
+                                                onkeyup="if(event.key === 'Enter') app.loginToCompany()"
+                                                class="w-full pl-11 pr-4 py-3.5 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 placeholder:text-slate-300 focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all hover:border-slate-300"
+                                                placeholder="Kullanıcı adınız">
+                                        </div>
+                                    </div>
+
+                                    <!-- Şifre -->
+                                    <div>
+                                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Şifre</label>
+                                        <div class="relative group">
+                                            <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-primary transition-colors">
+                                                <i class="fa-solid fa-lock text-sm"></i>
+                                            </span>
+                                            <input type="password" id="login-password"
+                                                onkeyup="if(event.key === 'Enter') app.loginToCompany()"
+                                                class="w-full pl-11 pr-4 py-3.5 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 placeholder:text-slate-300 focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all hover:border-slate-300"
+                                                placeholder="Şifreniz">
+                                        </div>
+                                    </div>
+
+                                    <!-- Hata -->
+                                    <div id="login-error" class="hidden bg-red-50 border border-red-200 rounded-xl p-3.5 text-red-600 text-sm font-medium flex items-center gap-2">
+                                        <i class="fa-solid fa-circle-exclamation"></i>
+                                        <span id="login-error-text">Hatalı giriş!</span>
+                                    </div>
+
+                                    <!-- Giriş Butonu -->
+                                    <button onclick="app.loginToCompany()"
+                                        class="w-full bg-gradient-to-r from-primary to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-bold py-4 rounded-xl transition-all shadow-lg shadow-primary/25 active:scale-[0.98] flex items-center justify-center gap-2 text-sm">
+                                        <span>Giriş Yap</span>
+                                        <i class="fa-solid fa-arrow-right"></i>
+                                    </button>
+                                </div>
+
+                                <p class="text-center text-sm mt-6 text-slate-400">
+                                    Henüz firmanız yok mu?
+                                    <a onclick="app.toggleRegisterForm(true)" class="text-primary font-bold cursor-pointer hover:underline">Firma Oluştur</a>
+                                </p>
                             </div>
 
-                            <div class="space-y-5">
-                                <!-- Firma Seçimi -->
-                                <div>
-                                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Firma</label>
-                                    <select id="login-company-selector"
-                                        class="w-full px-4 py-3.5 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all hover:border-slate-300 cursor-pointer appearance-none"
-                                        style="background-image: url('data:image/svg+xml;charset=UTF-8,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%2394a3b8%22 stroke-width=%222%22%3E%3Cpath d=%22M6 9l6 6 6-6%22/%3E%3C/svg%3E'); background-repeat: no-repeat; background-position: right 12px center; background-size: 18px;">
-                                        ${this.companies.map(c => `<option value="${c.id}">${c.name}</option>`).join('')}
-                                    </select>
+                            <!-- ===== REGISTER FORM ===== -->
+                            <div id="register-form-panel" class="hidden">
+                                <div class="mb-8">
+                                    <h2 class="text-2xl font-black text-slate-900 tracking-tight">Firma Kaydı</h2>
+                                    <p class="text-slate-400 mt-1.5 text-sm">Yeni firma hesabı oluşturun</p>
                                 </div>
 
-                                <!-- Kullanıcı Adı -->
-                                <div>
-                                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Kullanıcı Adı</label>
-                                    <div class="relative group">
-                                        <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-primary transition-colors">
-                                            <i class="fa-solid fa-user text-sm"></i>
-                                        </span>
-                                        <input type="text" id="login-username"
-                                            onkeyup="if(event.key === 'Enter') app.loginToCompany()"
-                                            class="w-full pl-11 pr-4 py-3.5 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 placeholder:text-slate-300 focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all hover:border-slate-300"
-                                            placeholder="Kullanıcı adınız">
+                                <div class="space-y-4">
+                                    <!-- Firma Adı -->
+                                    <div>
+                                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Firma Adı</label>
+                                        <div class="relative group">
+                                            <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-primary transition-colors">
+                                                <i class="fa-solid fa-building text-sm"></i>
+                                            </span>
+                                            <input type="text" id="reg-company-name"
+                                                class="w-full pl-11 pr-4 py-3.5 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 placeholder:text-slate-300 focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all hover:border-slate-300"
+                                                placeholder="Firma adınız">
+                                        </div>
                                     </div>
-                                </div>
 
-                                <!-- Şifre -->
-                                <div>
-                                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Şifre</label>
-                                    <div class="relative group">
-                                        <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-primary transition-colors">
-                                            <i class="fa-solid fa-lock text-sm"></i>
-                                        </span>
-                                        <input type="password" id="login-password"
-                                            onkeyup="if(event.key === 'Enter') app.loginToCompany()"
-                                            class="w-full pl-11 pr-4 py-3.5 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 placeholder:text-slate-300 focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all hover:border-slate-300"
-                                            placeholder="Şifreniz">
+                                    <!-- Yönetici Adı -->
+                                    <div>
+                                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Yönetici Adı</label>
+                                        <div class="relative group">
+                                            <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-primary transition-colors">
+                                                <i class="fa-solid fa-user-tie text-sm"></i>
+                                            </span>
+                                            <input type="text" id="reg-admin-name"
+                                                class="w-full pl-11 pr-4 py-3.5 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 placeholder:text-slate-300 focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all hover:border-slate-300"
+                                                placeholder="Ad Soyad">
+                                        </div>
                                     </div>
+
+                                    <!-- Kullanıcı Adı -->
+                                    <div>
+                                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Kullanıcı Adı</label>
+                                        <div class="relative group">
+                                            <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-primary transition-colors">
+                                                <i class="fa-solid fa-at text-sm"></i>
+                                            </span>
+                                            <input type="text" id="reg-username"
+                                                class="w-full pl-11 pr-4 py-3.5 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 placeholder:text-slate-300 focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all hover:border-slate-300"
+                                                placeholder="Giriş için kullanıcı adı">
+                                        </div>
+                                    </div>
+
+                                    <!-- Şifre -->
+                                    <div>
+                                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Şifre</label>
+                                        <div class="relative group">
+                                            <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-primary transition-colors">
+                                                <i class="fa-solid fa-lock text-sm"></i>
+                                            </span>
+                                            <input type="password" id="reg-password"
+                                                class="w-full pl-11 pr-4 py-3.5 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 placeholder:text-slate-300 focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all hover:border-slate-300"
+                                                placeholder="En az 6 karakter">
+                                        </div>
+                                    </div>
+
+                                    <!-- Şifre Tekrar -->
+                                    <div>
+                                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Şifre Tekrar</label>
+                                        <div class="relative group">
+                                            <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-primary transition-colors">
+                                                <i class="fa-solid fa-lock text-sm"></i>
+                                            </span>
+                                            <input type="password" id="reg-password-confirm"
+                                                onkeyup="if(event.key === 'Enter') app.registerCompany()"
+                                                class="w-full pl-11 pr-4 py-3.5 bg-white border border-slate-200 rounded-xl text-sm font-medium text-slate-700 placeholder:text-slate-300 focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all hover:border-slate-300"
+                                                placeholder="Şifrenizi tekrar girin">
+                                        </div>
+                                    </div>
+
+                                    <!-- Hata -->
+                                    <div id="register-error" class="hidden bg-red-50 border border-red-200 rounded-xl p-3.5 text-red-600 text-sm font-medium flex items-center gap-2">
+                                        <i class="fa-solid fa-circle-exclamation"></i>
+                                        <span id="register-error-text"></span>
+                                    </div>
+
+                                    <!-- Kayıt Ol Butonu -->
+                                    <button onclick="app.registerCompany()"
+                                        class="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold py-4 rounded-xl transition-all shadow-lg shadow-emerald-500/25 active:scale-[0.98] flex items-center justify-center gap-2 text-sm">
+                                        <i class="fa-solid fa-building-circle-check"></i>
+                                        <span>Firma Oluştur ve Başla</span>
+                                    </button>
                                 </div>
 
-                                <!-- Hata -->
-                                <div id="login-error" class="hidden bg-red-50 border border-red-200 rounded-xl p-3.5 text-red-600 text-sm font-medium flex items-center gap-2">
-                                    <i class="fa-solid fa-circle-exclamation"></i>
-                                    <span id="login-error-text">Hatalı giriş!</span>
-                                </div>
-
-                                <!-- Giriş Butonu -->
-                                <button onclick="app.loginToCompany()"
-                                    class="w-full bg-gradient-to-r from-primary to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-bold py-4 rounded-xl transition-all shadow-lg shadow-primary/25 active:scale-[0.98] flex items-center justify-center gap-2 text-sm">
-                                    <span>Giriş Yap</span>
-                                    <i class="fa-solid fa-arrow-right"></i>
-                                </button>
+                                <p class="text-center text-sm mt-6 text-slate-400">
+                                    Zaten hesabınız var mı?
+                                    <a onclick="app.toggleRegisterForm(false)" class="text-primary font-bold cursor-pointer hover:underline">Giriş Yap</a>
+                                </p>
                             </div>
 
                             <p class="text-center text-slate-300 text-xs mt-8">8D AI Problem Solving Platform v5.0</p>
@@ -1925,6 +2027,100 @@
                     errorDiv.classList.remove('hidden');
                     errorText.textContent = 'Firma bulunamadı!';
                 }
+            },
+
+            toggleRegisterForm(showRegister) {
+                const loginPanel = document.getElementById('login-form-panel');
+                const registerPanel = document.getElementById('register-form-panel');
+                if (loginPanel && registerPanel) {
+                    loginPanel.classList.toggle('hidden', showRegister);
+                    registerPanel.classList.toggle('hidden', !showRegister);
+                }
+                // Clear errors
+                const le = document.getElementById('login-error');
+                const re = document.getElementById('register-error');
+                if (le) le.classList.add('hidden');
+                if (re) re.classList.add('hidden');
+            },
+
+            registerCompany() {
+                const companyName = document.getElementById('reg-company-name').value.trim();
+                const adminName = document.getElementById('reg-admin-name').value.trim();
+                const username = document.getElementById('reg-username').value.trim();
+                const password = document.getElementById('reg-password').value;
+                const passwordConfirm = document.getElementById('reg-password-confirm').value;
+                const errorDiv = document.getElementById('register-error');
+                const errorText = document.getElementById('register-error-text');
+
+                const showError = (msg) => {
+                    errorDiv.classList.remove('hidden');
+                    errorText.textContent = msg;
+                };
+
+                // Validasyonlar
+                if (!companyName || !adminName || !username || !password) {
+                    showError('Lütfen tüm alanları doldurunuz.');
+                    return;
+                }
+                if (password.length < 6) {
+                    showError('Şifre en az 6 karakter olmalıdır.');
+                    return;
+                }
+                if (password !== passwordConfirm) {
+                    showError('Şifreler eşleşmiyor.');
+                    return;
+                }
+                if (this.companies.some(c => c.name.toLowerCase() === companyName.toLowerCase())) {
+                    showError('Bu firma adı zaten kayıtlı.');
+                    return;
+                }
+
+                // Yeni firma oluştur
+                const userId = 'user-' + Math.random().toString(36).substr(2, 9);
+                const companyId = 'company-' + Date.now();
+                const newCompany = {
+                    id: companyId,
+                    name: companyName,
+                    logo: null,
+                    createdAt: new Date().toISOString(),
+                    onboardingComplete: false,
+                    sector: '',
+                    standard: '',
+                    processes: [],
+                    departments: ['Üretim', 'Kalite', 'Mühendislik'],
+                    facilityLocations: ['Merkez Fabrika'],
+                    shifts: [],
+                    memory: { past8D: [], fmeaRecords: [], lessonsLearned: [], documents: [] },
+                    users: [{
+                        id: userId,
+                        name: adminName,
+                        username: username,
+                        password: password,
+                        role: 'Yönetici',
+                        department: 'Yönetim',
+                        duty: 'Sistem Yöneticisi'
+                    }]
+                };
+
+                this.companies.push(newCompany);
+                this.saveCompanies();
+
+                // Otomatik login
+                this.activeCompanyId = companyId;
+                this.activeUserId = userId;
+                this.activeUserRole = 'Yönetici';
+
+                sessionStorage.setItem('8d_current_company', companyId);
+                sessionStorage.setItem('8d_active_user', userId);
+                sessionStorage.setItem('8d_logged_in', 'true');
+
+                this.loadFromStorage();
+                this.updateHeaderWithCompany();
+                this.currentStep = -1;
+                this.renderView();
+
+                // Onboarding wizard
+                setTimeout(() => this.showOnboardingWizard(), 400);
             },
 
             logout() {
