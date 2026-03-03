@@ -1238,16 +1238,16 @@
 
                                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
                                         <!-- FMEA Records -->
-                                        <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex flex-col h-full">
+                                        <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex flex-col h-full overflow-hidden min-w-0">
                                             <h4 class="font-bold text-slate-700 text-lg mb-4 flex items-center gap-2">
                                                 <i class="fa-solid fa-table border-slate-200 text-orange-500"></i> Mevcut FMEA Kritik Kayıtları
                                             </h4>
                                             
                                             <!-- FMEA Add Form -->
-                                            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-4 space-y-3">
-                                                <input type="text" id="new-fmea-process" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-orange-500" placeholder="Proses Adı (Örn: Montaj)">
-                                                <input type="text" id="new-fmea-failure" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-orange-500" placeholder="Hata Modu (Örn: Vida Eksik)">
-                                                <textarea id="new-fmea-controls" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-orange-500 resize-none h-16" placeholder="Mevcut Kontroller (Örn: Kamera ile görsel kontrol)"></textarea>
+                                            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-4 space-y-3 overflow-hidden">
+                                                <input type="text" id="new-fmea-process" class="w-full min-w-0 px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-orange-500 box-border" placeholder="Proses Adı (Örn: Montaj)">
+                                                <input type="text" id="new-fmea-failure" class="w-full min-w-0 px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-orange-500 box-border" placeholder="Hata Modu (Örn: Vida Eksik)">
+                                                <textarea id="new-fmea-controls" class="w-full min-w-0 px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-orange-500 resize-none h-16 box-border" placeholder="Mevcut Kontroller (Örn: Kamera ile görsel kontrol)"></textarea>
                                                 <button onclick="app.addFmeaRecord()" class="w-full bg-orange-600 text-white font-bold py-2 rounded-lg hover:bg-orange-700 transition">Kayıt Ekle</button>
                                             </div>
 
@@ -1256,15 +1256,15 @@
                                         </div>
 
                                         <!-- Lessons Learned -->
-                                        <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex flex-col h-full">
+                                        <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex flex-col h-full overflow-hidden min-w-0">
                                             <h4 class="font-bold text-slate-700 text-lg mb-4 flex items-center gap-2">
                                                 <i class="fa-solid fa-graduation-cap text-teal-500"></i> Öğrenilmiş Dersler (Lessons Learned)
                                             </h4>
                                             
                                             <!-- LL Add Form -->
-                                            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-4 space-y-3">
-                                                <input type="text" id="new-ll-topic" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-teal-500" placeholder="Konu / Problem (Örn: Boya akıntı hatası)">
-                                                <textarea id="new-ll-lesson" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-teal-500 resize-none h-20" placeholder="Çıkarılan Ders ve Sistemsel Önlem (Örn: Basınç sensörü eklendi, manuel ayar iptal edildi)"></textarea>
+                                            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-4 space-y-3 overflow-hidden">
+                                                <input type="text" id="new-ll-topic" class="w-full min-w-0 px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-teal-500 box-border" placeholder="Konu / Problem (Örn: Boya akıntı hatası)">
+                                                <textarea id="new-ll-lesson" class="w-full min-w-0 px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-teal-500 resize-none h-20 box-border" placeholder="Çıkarılan Ders ve Sistemsel Önlem (Örn: Basınç sensörü eklendi, manuel ayar iptal edildi)"></textarea>
                                                 <button onclick="app.addLessonLearned()" class="w-full bg-teal-600 text-white font-bold py-2 rounded-lg hover:bg-teal-700 transition">Ders Ekle</button>
                                             </div>
 
@@ -1291,17 +1291,17 @@
                                             <i class="fa-solid fa-folder-open text-indigo-500"></i> Doküman Kütüphanesi
                                         </h4>
                                         <p class="text-xs text-slate-400 mb-4">PDF, Excel, TXT gibi dokümanlarınızı yükleyin. AI analizleri bu dokümanların özetlerini bağlam olarak kullanacak.</p>
-                                        <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3 mb-4">
-                                            <div class="flex gap-3 items-center">
+                                        <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3 mb-4 overflow-hidden">
+                                            <div class="flex gap-3 items-center flex-wrap">
                                                 <input type="file" id="doc-file-input" accept=".txt,.pdf,.xlsx,.xls,.docx,.doc" class="hidden" onchange="app.handleDocumentUpload(event)">
-                                                <button onclick="document.getElementById('doc-file-input').click()" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 px-4 py-2 rounded-lg text-sm font-bold transition flex items-center gap-2">
+                                                <button onclick="document.getElementById('doc-file-input').click()" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 px-4 py-2 rounded-lg text-sm font-bold transition flex items-center gap-2 shrink-0">
                                                     <i class="fa-solid fa-upload"></i> Dosya Seç
                                                 </button>
-                                                <span id="doc-file-name" class="text-sm text-slate-400 italic">Dosya seçilmedi</span>
+                                                <span id="doc-file-name" class="text-sm text-slate-400 italic truncate min-w-0">Dosya seçilmedi</span>
                                             </div>
                                             <div>
                                                 <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Özet / Açıklama <span class="text-slate-400 font-normal normal-case">(txt için otomatik doldurulur, max 2000 karakter)</span></label>
-                                                <textarea id="doc-summary-input" rows="3" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500 resize-none" placeholder="Bu dokümanın içerdiği kritik bilgilerin özeti..."></textarea>
+                                                <textarea id="doc-summary-input" rows="3" class="w-full min-w-0 px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500 resize-none box-border" placeholder="Bu dokümanın içerdiği kritik bilgilerin özeti..."></textarea>
                                             </div>
                                             <button onclick="app.saveDocument()" class="w-full bg-indigo-600 text-white font-bold py-2 rounded-lg hover:bg-indigo-700 transition">Kaydet</button>
                                         </div>
