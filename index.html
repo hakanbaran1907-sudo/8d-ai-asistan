@@ -1902,10 +1902,12 @@
                         sessionStorage.setItem('8d_logged_in', 'true');
 
                         // Beta: Sentry user context
-                        if (typeof Sentry !== 'undefined') {
-                            Sentry.setUser({ id: this.activeUserId, role: this.activeUserRole });
-                            Sentry.setTag('company_id', this.activeCompanyId);
-                        }
+                        try {
+                            if (typeof Sentry !== 'undefined' && Sentry.getCurrentScope) {
+                                Sentry.getCurrentScope().setUser({ id: this.activeUserId, role: this.activeUserRole });
+                                Sentry.getCurrentScope().setTag('company_id', this.activeCompanyId);
+                            }
+                        } catch(e) { /* Sentry optional */ }
 
                         this.loadFromStorage();
                         this.updateHeaderWithCompany();
@@ -1931,7 +1933,7 @@
                     sessionStorage.removeItem('8d_current_company');
                     sessionStorage.removeItem('8d_active_user');
                     // Beta: Clear Sentry user
-                    if (typeof Sentry !== 'undefined') Sentry.setUser(null);
+                    try { if (typeof Sentry !== 'undefined' && Sentry.getCurrentScope) Sentry.getCurrentScope().setUser(null); } catch(e) {}
                     this.activeCompanyId = null;
                     this.activeUserId = null;
                     this.activeUserRole = null;
