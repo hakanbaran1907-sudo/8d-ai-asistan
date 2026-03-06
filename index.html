@@ -58,6 +58,8 @@
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <!-- SheetJS - Excel Parsing -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
     <!-- Sentry Error Monitoring (Beta) -->
     <!-- AYAR: Sentry DSN'nizi aşağıya girin. sentry.io'da ücretsiz proje oluşturun -->
@@ -747,7 +749,7 @@
                         processes: [],
                         departments: ['Üretim', 'Kalite', 'Mühendislik'],
                         facilityLocations: ['Merkez Fabrika'],
-                        memory: { past8D: [], fmeaRecords: [], lessonsLearned: [], documents: [] }
+                        memory: { past8D: [], fmeaRecords: [], lessonsLearned: [], documents: [], parsedFmeaSheets: [] }
                     };
                     this.companies.push(defaultCompany);
                     this.saveCompanies();
@@ -870,8 +872,14 @@
                         company.memory = {
                             past8D: [],
                             fmeaRecords: [],
-                            lessonsLearned: []
+                            lessonsLearned: [],
+                            documents: [],
+                            parsedFmeaSheets: []
                         };
+                        changed = true;
+                    }
+                    if (!company.memory.parsedFmeaSheets) {
+                        company.memory.parsedFmeaSheets = [];
                         changed = true;
                     }
                 });
@@ -1236,19 +1244,57 @@
                                         <p class="text-sm text-slate-500 mt-1">Firmanızın geçmişteki kritik FMEA (Hata Türü ve Etkileri Analizi) ve Öğrenilmiş Dersler (Lessons Learned) kayıtlarını buraya ekleyin. Yapay Zeka yeni sorunları çözerken bu tecrübeleri dikkate alacaktır.</p>
                                     </div>
 
+                                    <!-- PFMEA Excel Upload Card -->
+                                    <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+                                        <h4 class="font-bold text-slate-700 text-lg mb-1 flex items-center gap-2">
+                                            <i class="fa-solid fa-file-excel text-green-600"></i> PFMEA / FMEA Excel Yükle
+                                            <span class="bg-green-100 text-green-700 text-[10px] font-black px-2 py-0.5 rounded-lg uppercase tracking-widest ml-2">Yeni</span>
+                                        </h4>
+                                        <p class="text-xs text-slate-400 mb-4">Mevcut PFMEA Excel dosyanızı yükleyin. AI analizlerinde öncelikli olarak kullanılacaktır.</p>
+
+                                        <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-4">
+                                            <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Excel Dosyası</label>
+                                            <div class="flex gap-3 items-center flex-wrap mb-3">
+                                                <input type="file" id="pfmea-file-input" accept=".xlsx,.xls" class="hidden" onchange="app.handlePfmeaUpload(event)">
+                                                <button onclick="document.getElementById('pfmea-file-input').click()"
+                                                    class="bg-green-50 hover:bg-green-100 text-green-700 border border-green-200 px-4 py-2.5 rounded-lg text-sm font-bold transition flex items-center gap-2 shrink-0">
+                                                    <i class="fa-solid fa-file-excel"></i> Excel Seç
+                                                </button>
+                                                <span id="pfmea-file-name" class="text-sm text-slate-400 italic truncate min-w-0">Dosya seçilmedi</span>
+                                            </div>
+
+                                            <div id="pfmea-sheet-selector" class="hidden mb-3"></div>
+
+                                            <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Proses ile Eşleştir <span class="font-normal normal-case text-slate-400">(opsiyonel)</span></label>
+                                            <select id="pfmea-process-link" style="width:100%;box-sizing:border-box;" class="px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-green-400 mb-3">
+                                                <option value="">-- Proses seçin (tümü için boş bırakın) --</option>
+                                            </select>
+
+                                            <button onclick="app.saveParsedFmea()" style="width:100%;box-sizing:border-box;"
+                                                class="bg-green-600 text-white font-bold py-2.5 rounded-lg hover:bg-green-700 transition text-sm">
+                                                PFMEA'yı Kaydet
+                                            </button>
+                                        </div>
+
+                                        <div id="memory-list-pfmea-sheets" class="space-y-3 max-h-72 overflow-y-auto pr-1"></div>
+                                    </div>
+
                                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
                                         <!-- FMEA Records -->
-                                        <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex flex-col h-full overflow-hidden min-w-0">
+                                        <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex flex-col h-full min-w-0">
                                             <h4 class="font-bold text-slate-700 text-lg mb-4 flex items-center gap-2">
                                                 <i class="fa-solid fa-table border-slate-200 text-orange-500"></i> Mevcut FMEA Kritik Kayıtları
                                             </h4>
                                             
                                             <!-- FMEA Add Form -->
-                                            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-4 space-y-3 overflow-hidden">
-                                                <input type="text" id="new-fmea-process" class="w-full min-w-0 px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-orange-500 box-border" placeholder="Proses Adı (Örn: Montaj)">
-                                                <input type="text" id="new-fmea-failure" class="w-full min-w-0 px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-orange-500 box-border" placeholder="Hata Modu (Örn: Vida Eksik)">
-                                                <textarea id="new-fmea-controls" class="w-full min-w-0 px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-orange-500 resize-none h-16 box-border" placeholder="Mevcut Kontroller (Örn: Kamera ile görsel kontrol)"></textarea>
-                                                <button onclick="app.addFmeaRecord()" class="w-full bg-orange-600 text-white font-bold py-2 rounded-lg hover:bg-orange-700 transition">Kayıt Ekle</button>
+                                            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-4">
+                                                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Proses</label>
+                                                <input type="text" id="new-fmea-process" style="width:100%;box-sizing:border-box;" class="px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-400 transition mb-3" placeholder="Örn: Montaj">
+                                                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Hata Modu</label>
+                                                <input type="text" id="new-fmea-failure" style="width:100%;box-sizing:border-box;" class="px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-400 transition mb-3" placeholder="Örn: Vida Eksik">
+                                                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Mevcut Kontroller</label>
+                                                <textarea id="new-fmea-controls" rows="2" style="width:100%;box-sizing:border-box;" class="px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-400 resize-none transition mb-3" placeholder="Örn: Kamera ile görsel kontrol"></textarea>
+                                                <button onclick="app.addFmeaRecord()" style="width:100%;box-sizing:border-box;" class="bg-orange-600 text-white font-bold py-2.5 rounded-lg hover:bg-orange-700 transition text-sm">Kayıt Ekle</button>
                                             </div>
 
                                             <!-- FMEA List -->
@@ -1256,16 +1302,18 @@
                                         </div>
 
                                         <!-- Lessons Learned -->
-                                        <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex flex-col h-full overflow-hidden min-w-0">
+                                        <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex flex-col h-full min-w-0">
                                             <h4 class="font-bold text-slate-700 text-lg mb-4 flex items-center gap-2">
                                                 <i class="fa-solid fa-graduation-cap text-teal-500"></i> Öğrenilmiş Dersler (Lessons Learned)
                                             </h4>
                                             
                                             <!-- LL Add Form -->
-                                            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-4 space-y-3 overflow-hidden">
-                                                <input type="text" id="new-ll-topic" class="w-full min-w-0 px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-teal-500 box-border" placeholder="Konu / Problem (Örn: Boya akıntı hatası)">
-                                                <textarea id="new-ll-lesson" class="w-full min-w-0 px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-teal-500 resize-none h-20 box-border" placeholder="Çıkarılan Ders ve Sistemsel Önlem (Örn: Basınç sensörü eklendi, manuel ayar iptal edildi)"></textarea>
-                                                <button onclick="app.addLessonLearned()" class="w-full bg-teal-600 text-white font-bold py-2 rounded-lg hover:bg-teal-700 transition">Ders Ekle</button>
+                                            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-4">
+                                                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Konu / Problem</label>
+                                                <input type="text" id="new-ll-topic" style="width:100%;box-sizing:border-box;" class="px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-400 transition mb-3" placeholder="Örn: Boya akıntı hatası">
+                                                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Çıkarılan Ders</label>
+                                                <textarea id="new-ll-lesson" rows="3" style="width:100%;box-sizing:border-box;" class="px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-400 resize-none transition mb-3" placeholder="Örn: Basınç sensörü eklendi, manuel ayar iptal edildi"></textarea>
+                                                <button onclick="app.addLessonLearned()" style="width:100%;box-sizing:border-box;" class="bg-teal-600 text-white font-bold py-2.5 rounded-lg hover:bg-teal-700 transition text-sm">Ders Ekle</button>
                                             </div>
 
                                             <!-- LL List -->
@@ -1291,19 +1339,18 @@
                                             <i class="fa-solid fa-folder-open text-indigo-500"></i> Doküman Kütüphanesi
                                         </h4>
                                         <p class="text-xs text-slate-400 mb-4">PDF, Excel, TXT gibi dokümanlarınızı yükleyin. AI analizleri bu dokümanların özetlerini bağlam olarak kullanacak.</p>
-                                        <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3 mb-4 overflow-hidden">
-                                            <div class="flex gap-3 items-center flex-wrap">
+                                        <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-4">
+                                            <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Dosya</label>
+                                            <div class="flex gap-3 items-center flex-wrap mb-3">
                                                 <input type="file" id="doc-file-input" accept=".txt,.pdf,.xlsx,.xls,.docx,.doc" class="hidden" onchange="app.handleDocumentUpload(event)">
-                                                <button onclick="document.getElementById('doc-file-input').click()" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 px-4 py-2 rounded-lg text-sm font-bold transition flex items-center gap-2 shrink-0">
+                                                <button onclick="document.getElementById('doc-file-input').click()" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 px-4 py-2.5 rounded-lg text-sm font-bold transition flex items-center gap-2 shrink-0">
                                                     <i class="fa-solid fa-upload"></i> Dosya Seç
                                                 </button>
                                                 <span id="doc-file-name" class="text-sm text-slate-400 italic truncate min-w-0">Dosya seçilmedi</span>
                                             </div>
-                                            <div>
-                                                <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Özet / Açıklama <span class="text-slate-400 font-normal normal-case">(txt için otomatik doldurulur, max 2000 karakter)</span></label>
-                                                <textarea id="doc-summary-input" rows="3" class="w-full min-w-0 px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500 resize-none box-border" placeholder="Bu dokümanın içerdiği kritik bilgilerin özeti..."></textarea>
-                                            </div>
-                                            <button onclick="app.saveDocument()" class="w-full bg-indigo-600 text-white font-bold py-2 rounded-lg hover:bg-indigo-700 transition">Kaydet</button>
+                                            <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Özet / Açıklama <span class="text-slate-400 font-normal normal-case">(txt için otomatik, max 2000 karakter)</span></label>
+                                            <textarea id="doc-summary-input" rows="3" style="width:100%;box-sizing:border-box;" class="px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 resize-none transition mb-3" placeholder="Bu dokümanın içerdiği kritik bilgilerin özeti..."></textarea>
+                                            <button onclick="app.saveDocument()" style="width:100%;box-sizing:border-box;" class="bg-indigo-600 text-white font-bold py-2.5 rounded-lg hover:bg-indigo-700 transition text-sm">Kaydet</button>
                                         </div>
                                         <div id="memory-list-docs" class="space-y-3 max-h-72 overflow-y-auto pr-1"></div>
                                     </div>
@@ -1736,9 +1783,9 @@
                     default: container.innerHTML = '<p>Hata: Sayfa bulunamadı.</p>';
                 }
 
-                // Auto-resize all textareas after render
+                // Auto-resize textareas after render (skip form textareas with rows attribute)
                 setTimeout(() => {
-                    document.querySelectorAll('textarea').forEach(el => {
+                    document.querySelectorAll('textarea:not([rows])').forEach(el => {
                         el.style.height = 'auto';
                         el.style.height = (el.scrollHeight + 2) + 'px';
                     });
@@ -2090,7 +2137,7 @@
                     departments: ['Üretim', 'Kalite', 'Mühendislik'],
                     facilityLocations: ['Merkez Fabrika'],
                     shifts: [],
-                    memory: { past8D: [], fmeaRecords: [], lessonsLearned: [], documents: [] },
+                    memory: { past8D: [], fmeaRecords: [], lessonsLearned: [], documents: [], parsedFmeaSheets: [] },
                     users: [{
                         id: userId,
                         name: adminName,
@@ -4299,11 +4346,41 @@
                     ctx += `\nFirmanın Prosesleri: ${procNames}\n`;
                 }
 
-                // FMEA Records
-                const fmea = company.memory?.fmeaRecords || [];
-                if (fmea.length > 0) {
-                    ctx += `\nFMEA Kritik Kayıtları (${fmea.length} adet, ilk 5):\n`;
-                    fmea.slice(0, 5).forEach(r => {
+                // FMEA Records — Zengin PFMEA öncelikli
+                const parsedSheets = company.memory?.parsedFmeaSheets || [];
+                const simpleFmea = company.memory?.fmeaRecords || [];
+
+                if (parsedSheets.length > 0) {
+                    const currentProcess = this.data?.header?.process || '';
+                    const relevantSheets = currentProcess
+                        ? parsedSheets.filter(s =>
+                            s.processName === currentProcess ||
+                            s.sheetName.toLowerCase().includes(currentProcess.toLowerCase()) ||
+                            currentProcess.toLowerCase().includes(s.sheetName.toLowerCase())
+                          )
+                        : parsedSheets;
+                    const sheetsToUse = relevantSheets.length > 0 ? relevantSheets : parsedSheets;
+
+                    let highRpnRows = [];
+                    sheetsToUse.forEach(sheet => {
+                        (sheet.rows || []).forEach(r => {
+                            if (r.rpn > 100 || r.failureMode) {
+                                highRpnRows.push({ ...r, _source: sheet.processName || sheet.sheetName });
+                            }
+                        });
+                    });
+                    highRpnRows.sort((a, b) => (b.rpn || 0) - (a.rpn || 0));
+                    highRpnRows = highRpnRows.slice(0, 15);
+
+                    if (highRpnRows.length > 0) {
+                        ctx += `\nKRİTİK: AŞAĞIDAKİ VERİLER FİRMANIN PFMEA DOKÜMANLARINDAN GELMEKTEDİR. Analizinde MUTLAKA bu FMEA verilerini baz al:\n`;
+                        highRpnRows.forEach(r => {
+                            ctx += `  [FMEA|${r._source}] Adım: ${r.processStep || '-'} | Hata: ${r.failureMode} | Neden: ${r.cause || '-'} | Kontrol: ${[r.controlPrevention, r.controlDetection].filter(Boolean).join('/') || '-'} | RPN:${r.rpn || '-'}\n`;
+                        });
+                    }
+                } else if (simpleFmea.length > 0) {
+                    ctx += `\nFMEA Kritik Kayıtları (${simpleFmea.length} adet, ilk 5):\n`;
+                    simpleFmea.slice(0, 5).forEach(r => {
                         ctx += `  - Proses: ${r.process} | Hata: ${r.failureMode} | Kontrol: ${r.currentControls}\n`;
                     });
                 }
@@ -7896,6 +7973,17 @@ LÜTFEN SADECE AŞAĞIDAKİ JSON FORMATINDA YANIT VER:
                         `).join('');
                     }
                 }
+
+                // PFMEA proses dropdown'ı doldur
+                const processSelect = document.getElementById('pfmea-process-link');
+                if (processSelect) {
+                    const processList = company.processes || [];
+                    processSelect.innerHTML = '<option value="">-- Proses seçin (tümü için boş bırakın) --</option>' +
+                        processList.map(p => `<option value="${typeof p === 'string' ? p : p.name}">${typeof p === 'string' ? p : p.name}</option>`).join('');
+                }
+
+                // PFMEA sheets listesi
+                this.renderPfmeaSheetsCard();
             },
 
             renderLLPool() {
@@ -8101,6 +8189,399 @@ LÜTFEN SADECE AŞAĞIDAKİ JSON FORMATINDA YANIT VER:
                         </div>
                     </div>
                 `).join('');
+            },
+
+            // ===== PFMEA Excel Fonksiyonları =====
+
+            handlePfmeaUpload(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+                const ext = file.name.split('.').pop().toLowerCase();
+                if (!['xlsx', 'xls'].includes(ext)) {
+                    this._showInfoToast('Lütfen bir Excel (.xlsx veya .xls) dosyası seçin.', 'red');
+                    return;
+                }
+                if (typeof XLSX === 'undefined') {
+                    this._showInfoToast('Excel okuyucu yüklenemedi. Sayfayı yenileyin.', 'red');
+                    return;
+                }
+                this._pendingPfmeaFile = file;
+                const nameEl = document.getElementById('pfmea-file-name');
+                if (nameEl) nameEl.textContent = file.name;
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const workbook = XLSX.read(e.target.result, { type: 'array' });
+                        this._pendingPfmeaWorkbook = workbook;
+                        this._renderPfmeaSheetSelector(workbook);
+                    } catch (err) {
+                        this._showInfoToast('Excel dosyası okunamadı: ' + err.message, 'red');
+                    }
+                };
+                reader.readAsArrayBuffer(file);
+            },
+
+            _renderPfmeaSheetSelector(workbook) {
+                const container = document.getElementById('pfmea-sheet-selector');
+                if (!container) return;
+                const sheets = workbook.SheetNames;
+                container.innerHTML = `
+                    <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Sheet Seçin (${sheets.length} sheet bulundu)</label>
+                    <div class="flex flex-wrap gap-2 mb-3">
+                        ${sheets.map((name, i) => `
+                            <button onclick="app._selectPfmeaSheet('${name.replace(/'/g, "\\\\'")}')" id="pfmea-sheet-btn-${i}"
+                                class="px-3 py-1.5 text-xs font-bold border rounded-lg transition ${i === 0 ? 'bg-green-100 border-green-400 text-green-700' : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-green-300'}">
+                                ${name}
+                            </button>
+                        `).join('')}
+                    </div>
+                    <div id="pfmea-preview-table"></div>
+                `;
+                container.classList.remove('hidden');
+                if (sheets.length > 0) this._selectPfmeaSheet(sheets[0]);
+            },
+
+            _selectPfmeaSheet(sheetName) {
+                this._pendingPfmeaSheetName = sheetName;
+                const wb = this._pendingPfmeaWorkbook;
+                if (!wb) return;
+
+                // Sheet butonlarını güncelle
+                wb.SheetNames.forEach((name, i) => {
+                    const btn = document.getElementById('pfmea-sheet-btn-' + i);
+                    if (btn) {
+                        btn.className = name === sheetName
+                            ? 'px-3 py-1.5 text-xs font-bold border rounded-lg transition bg-green-100 border-green-400 text-green-700'
+                            : 'px-3 py-1.5 text-xs font-bold border rounded-lg transition bg-slate-50 border-slate-200 text-slate-600 hover:border-green-300';
+                    }
+                });
+
+                const ws = wb.Sheets[sheetName];
+                const rawData = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+
+                if (rawData.length < 2) {
+                    const preview = document.getElementById('pfmea-preview-table');
+                    if (preview) preview.innerHTML = '<p class="text-xs text-red-500 italic">Bu sheet boş veya veri içermiyor.</p>';
+                    return;
+                }
+
+                const headerRow = rawData[0].map(h => String(h).toLowerCase().trim());
+                const colMap = this._detectPfmeaColumns(headerRow);
+                const rows = rawData.slice(1)
+                    .map(row => this._mapPfmeaRow(row, colMap))
+                    .filter(r => r.failureMode || r.processStep);
+
+                this._pendingPfmeaRows = rows;
+                this._pendingPfmeaColMap = colMap;
+                this._renderPfmeaPreview(rows, colMap);
+            },
+
+            _detectPfmeaColumns(headerRow) {
+                const matchers = {
+                    processStep:       ['proses adımı', 'proses', 'process step', 'function', 'fonksiyon', 'operasyon', 'process function', 'proses adı'],
+                    failureMode:       ['hata modu', 'potansiyel hata', 'failure mode', 'potential failure', 'hata türü'],
+                    effect:            ['etkisi', 'hata etkisi', 'effect', 'potential effect', 'etkileri'],
+                    severity:          ['şiddet', 'severity', 'önem derecesi', 'ciddiyet'],
+                    cause:             ['neden', 'hata nedeni', 'cause', 'potential cause', 'sebep'],
+                    occurrence:        ['oluşum', 'occurrence', 'olasılık', 'sıklık'],
+                    controlPrevention: ['önleme kontrolü', 'önleyici kontrol', 'prevention control', 'current controls prevention', 'önleme'],
+                    controlDetection:  ['tespit kontrolü', 'mevcut kontroller', 'detection control', 'current controls detection', 'current process controls', 'mevcut kontrol'],
+                    detection:         ['tespit', 'detection', 'algılama', 'saptama'],
+                    rpn:               ['rpn', 'risk öncelik', 'risk priority', 'risk sayısı', 'rön'],
+                    recommendedAction: ['önerilen aksiyon', 'recommended action', 'tavsiye', 'önerilen faaliyet', 'aksiyon'],
+                    actionResults:     ['aksiyon sonucu', 'action results', 'sonuç', 'revize']
+                };
+
+                const colMap = {};
+                headerRow.forEach((h, idx) => {
+                    for (const [fieldName, keywords] of Object.entries(matchers)) {
+                        if (!colMap[fieldName] && keywords.some(kw => h.includes(kw))) {
+                            colMap[fieldName] = idx;
+                        }
+                    }
+                    // Tek harfli S, O, D sütunları (tam eşleşme)
+                    if (!colMap.severity && h === 's') colMap.severity = idx;
+                    if (!colMap.occurrence && h === 'o') colMap.occurrence = idx;
+                    if (!colMap.detection && h === 'd') colMap.detection = idx;
+                });
+                return colMap;
+            },
+
+            _mapPfmeaRow(row, colMap) {
+                const get = (field) => {
+                    const idx = colMap[field];
+                    if (idx === undefined || idx === null) return '';
+                    const val = row[idx];
+                    return val === null || val === undefined ? '' : String(val).trim().substring(0, 200);
+                };
+                const getInt = (field) => {
+                    const v = parseInt(get(field));
+                    return isNaN(v) ? 0 : v;
+                };
+                const s = getInt('severity');
+                const o = getInt('occurrence');
+                const d = getInt('detection');
+                return {
+                    processStep: get('processStep'),
+                    failureMode: get('failureMode'),
+                    effect: get('effect'),
+                    severity: s,
+                    cause: get('cause'),
+                    occurrence: o,
+                    controlPrevention: get('controlPrevention'),
+                    controlDetection: get('controlDetection'),
+                    detection: d,
+                    rpn: (s && o && d) ? s * o * d : getInt('rpn'),
+                    recommendedAction: get('recommendedAction'),
+                    actionResults: get('actionResults')
+                };
+            },
+
+            _renderPfmeaPreview(rows, colMap) {
+                const container = document.getElementById('pfmea-preview-table');
+                if (!container) return;
+                const mappedCount = Object.keys(colMap).length;
+                const previewRows = rows.slice(0, 5);
+                container.innerHTML = `
+                    <div class="bg-green-50 border border-green-200 rounded-xl p-3">
+                        <div class="flex items-center gap-2 mb-2">
+                            <i class="fa-solid fa-circle-check text-green-600 text-sm"></i>
+                            <span class="text-xs font-bold text-green-700">${rows.length} satır tespit edildi · ${mappedCount} sütun eşlendi</span>
+                        </div>
+                        ${mappedCount === 0 ? '<p class="text-xs text-amber-600 mb-2">Standart sütun başlıkları bulunamadı. Sütun isimlerini kontrol edin.</p>' : ''}
+                        ${previewRows.length > 0 ? `
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-[11px] mt-1">
+                                <thead><tr class="bg-green-100">
+                                    <th class="text-left p-1.5 font-black text-green-800">Proses Adımı</th>
+                                    <th class="text-left p-1.5 font-black text-green-800">Hata Modu</th>
+                                    <th class="text-left p-1.5 font-black text-green-800">Neden</th>
+                                    <th class="text-center p-1.5 font-black text-red-700">RPN</th>
+                                </tr></thead>
+                                <tbody>
+                                    ${previewRows.map(r => `
+                                        <tr class="border-b border-green-100">
+                                            <td class="p-1.5 text-slate-700">${r.processStep || '-'}</td>
+                                            <td class="p-1.5 font-medium text-slate-800">${r.failureMode || '-'}</td>
+                                            <td class="p-1.5 text-slate-600">${r.cause || '-'}</td>
+                                            <td class="p-1.5 text-center font-bold ${r.rpn > 100 ? 'text-red-600' : 'text-slate-500'}">${r.rpn || '-'}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                            ${rows.length > 5 ? `<p class="text-[10px] text-slate-400 mt-1 italic">... ve ${rows.length - 5} satır daha</p>` : ''}
+                        </div>` : ''}
+                    </div>
+                `;
+            },
+
+            saveParsedFmea() {
+                const file = this._pendingPfmeaFile;
+                const rows = this._pendingPfmeaRows;
+                const sheetName = this._pendingPfmeaSheetName;
+
+                if (!file || !rows || rows.length === 0) {
+                    this._showInfoToast('Lütfen önce geçerli bir Excel dosyası seçin ve sheet seçin.', 'red');
+                    return;
+                }
+
+                const linkedProcess = document.getElementById('pfmea-process-link')?.value || '';
+                const company = this.companies.find(c => c.id === this.activeCompanyId);
+                if (!company) return;
+                if (!company.memory.parsedFmeaSheets) company.memory.parsedFmeaSheets = [];
+
+                // Boyut kontrolü
+                const testCompany = JSON.parse(JSON.stringify(company));
+                testCompany.memory.parsedFmeaSheets.push({ rows });
+                if (JSON.stringify(testCompany).length > 800000) {
+                    this._showInfoToast('Depolama sınırına yaklaşıldı. Eski PFMEA dosyalarını silin.', 'red');
+                    return;
+                }
+
+                company.memory.parsedFmeaSheets.push({
+                    id: 'pfmea-' + Math.random().toString(36).substr(2, 9),
+                    fileName: file.name,
+                    uploadDate: new Date().toISOString().split('T')[0],
+                    sheetName: sheetName,
+                    processName: linkedProcess,
+                    rowCount: rows.length,
+                    uploadedBy: this.activeUserId || '',
+                    rows: rows
+                });
+                this.saveCompanies();
+
+                // Temizle
+                this._pendingPfmeaFile = null;
+                this._pendingPfmeaWorkbook = null;
+                this._pendingPfmeaRows = null;
+                this._pendingPfmeaSheetName = null;
+                const fileInput = document.getElementById('pfmea-file-input');
+                if (fileInput) fileInput.value = '';
+                const nameEl = document.getElementById('pfmea-file-name');
+                if (nameEl) nameEl.textContent = 'Dosya seçilmedi';
+                const selector = document.getElementById('pfmea-sheet-selector');
+                if (selector) { selector.innerHTML = ''; selector.classList.add('hidden'); }
+
+                this._showInfoToast(`${rows.length} adet FMEA satırı başarıyla kaydedildi!`, 'green');
+                this.renderPfmeaSheetsCard();
+            },
+
+            removeParsedFmea(sheetId) {
+                if (!confirm('Bu PFMEA verisini silmek istediğinize emin misiniz?')) return;
+                const company = this.companies.find(c => c.id === this.activeCompanyId);
+                if (company?.memory?.parsedFmeaSheets) {
+                    company.memory.parsedFmeaSheets = company.memory.parsedFmeaSheets.filter(s => s.id !== sheetId);
+                    this.saveCompanies();
+                    this.renderPfmeaSheetsCard();
+                }
+            },
+
+            renderPfmeaSheetsCard() {
+                const container = document.getElementById('memory-list-pfmea-sheets');
+                if (!container) return;
+                const company = this.companies.find(c => c.id === this.activeCompanyId);
+                const sheets = company?.memory?.parsedFmeaSheets || [];
+
+                if (sheets.length === 0) {
+                    container.innerHTML = '<p class="text-xs text-slate-400 italic text-center py-4">Henüz PFMEA Excel yüklenmedi.</p>';
+                    return;
+                }
+
+                container.innerHTML = sheets.map(sheet => {
+                    const highRpn = sheet.rows.filter(r => r.rpn > 100).length;
+                    return `
+                        <div class="bg-white border border-slate-200 rounded-xl p-3 group relative hover:shadow-sm transition">
+                            <button onclick="app.removeParsedFmea('${sheet.id}')"
+                                class="absolute top-2 right-2 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition">
+                                <i class="fa-solid fa-trash-can text-sm"></i>
+                            </button>
+                            <div class="flex items-start gap-3">
+                                <i class="fa-solid fa-file-excel text-green-600 text-xl mt-0.5 shrink-0"></i>
+                                <div class="min-w-0 flex-1">
+                                    <div class="text-sm font-bold text-slate-800 truncate">${sheet.fileName}</div>
+                                    <div class="text-[10px] text-slate-400 mb-2">${sheet.uploadDate} · Sheet: ${sheet.sheetName} · ${sheet.rowCount} satır</div>
+                                    <div class="flex gap-2 flex-wrap">
+                                        ${sheet.processName ? `<span class="bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-0.5 rounded-lg">${sheet.processName}</span>` : ''}
+                                        ${highRpn > 0 ? `<span class="bg-red-100 text-red-700 text-[10px] font-bold px-2 py-0.5 rounded-lg">${highRpn} Yüksek RPN</span>` : ''}
+                                    </div>
+                                    <button onclick="app.showPfmeaTable('${sheet.id}')"
+                                        class="mt-2 text-[11px] font-bold text-green-700 hover:text-green-900 flex items-center gap-1 transition">
+                                        <i class="fa-solid fa-table text-[10px]"></i> Tabloyu Görüntüle
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            },
+
+            showPfmeaTable(sheetId) {
+                const company = this.companies.find(c => c.id === this.activeCompanyId);
+                const sheet = company?.memory?.parsedFmeaSheets?.find(s => s.id === sheetId);
+                if (!sheet) return;
+
+                const existing = document.getElementById('_pfmea-table-modal');
+                if (existing) existing.remove();
+
+                const processSteps = [...new Set(sheet.rows.map(r => r.processStep).filter(Boolean))];
+                const el = document.createElement('div');
+                el.id = '_pfmea-table-modal';
+                el.className = 'fixed inset-0 bg-black/60 backdrop-blur-sm z-[9998] flex items-center justify-center p-4';
+                el.innerHTML = `
+                    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-6xl flex flex-col animate-fade-in" style="max-height:90vh;">
+                        <div class="bg-green-600 px-6 py-4 flex items-center justify-between rounded-t-3xl shrink-0">
+                            <div class="flex items-center gap-3">
+                                <i class="fa-solid fa-file-excel text-white text-xl"></i>
+                                <div>
+                                    <p class="font-black text-white">${sheet.fileName} — ${sheet.sheetName}</p>
+                                    <p class="text-green-100 text-xs">${sheet.rowCount} satır · ${sheet.uploadDate}</p>
+                                </div>
+                            </div>
+                            <button onclick="document.getElementById('_pfmea-table-modal').remove()"
+                                class="text-green-200 hover:text-white transition text-xl"><i class="fa-solid fa-xmark"></i></button>
+                        </div>
+                        <div class="flex gap-3 items-center px-6 py-3 border-b border-slate-100 bg-slate-50 shrink-0 flex-wrap">
+                            <select id="_pfmea-filter-step" onchange="app._filterPfmeaTable('${sheetId}')"
+                                class="px-3 py-1.5 border border-slate-200 rounded-lg text-sm bg-white outline-none">
+                                <option value="">Tüm Proses Adımları</option>
+                                ${processSteps.map(s => `<option value="${s}">${s}</option>`).join('')}
+                            </select>
+                            <label class="flex items-center gap-2 text-xs font-semibold text-slate-500 cursor-pointer">
+                                <input type="checkbox" id="_pfmea-filter-highrpn" onchange="app._filterPfmeaTable('${sheetId}')">
+                                Sadece Yüksek RPN (&gt;100)
+                            </label>
+                            <span id="_pfmea-filter-count" class="text-xs text-slate-400 ml-auto">${sheet.rows.length} satır gösteriliyor</span>
+                        </div>
+                        <div class="overflow-auto flex-1 p-4">
+                            <table class="w-full text-xs border-collapse">
+                                <thead class="sticky top-0 bg-slate-100 z-10">
+                                    <tr>
+                                        <th class="text-left p-2 font-black text-slate-600 border-b border-slate-200">Proses Adımı</th>
+                                        <th class="text-left p-2 font-black text-slate-600 border-b border-slate-200">Hata Modu</th>
+                                        <th class="text-left p-2 font-black text-slate-600 border-b border-slate-200">Etkisi</th>
+                                        <th class="text-center p-2 font-black text-slate-600 border-b border-slate-200 w-10">Ş</th>
+                                        <th class="text-left p-2 font-black text-slate-600 border-b border-slate-200">Neden</th>
+                                        <th class="text-center p-2 font-black text-slate-600 border-b border-slate-200 w-10">O</th>
+                                        <th class="text-left p-2 font-black text-slate-600 border-b border-slate-200">Kontroller</th>
+                                        <th class="text-center p-2 font-black text-slate-600 border-b border-slate-200 w-10">T</th>
+                                        <th class="text-center p-2 font-black text-red-600 border-b border-slate-200 w-14">RPN</th>
+                                        <th class="text-left p-2 font-black text-slate-600 border-b border-slate-200">Önerilen Aksiyon</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="_pfmea-tbody">
+                                    ${this._renderPfmeaTableRows(sheet.rows)}
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="px-6 py-4 border-t border-slate-100 shrink-0 flex justify-between items-center">
+                            <div class="text-xs text-slate-400">Ş=Şiddet · O=Oluşum · T=Tespit · RPN = Ş×O×T</div>
+                            <button onclick="document.getElementById('_pfmea-table-modal').remove()"
+                                class="bg-slate-900 text-white font-bold px-6 py-2.5 rounded-xl text-sm hover:bg-slate-700 transition">Kapat</button>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(el);
+            },
+
+            _renderPfmeaTableRows(rows) {
+                return rows.map(r => {
+                    const rpnClass = r.rpn > 200 ? 'bg-red-100 text-red-700 font-black' :
+                                     r.rpn > 100 ? 'bg-orange-100 text-orange-700 font-bold' :
+                                     r.rpn > 50  ? 'bg-yellow-50 text-yellow-700' : 'text-slate-500';
+                    return `
+                        <tr class="border-b border-slate-50 hover:bg-slate-50 transition">
+                            <td class="p-2 text-slate-700 font-medium">${r.processStep || '-'}</td>
+                            <td class="p-2 text-slate-800 font-semibold">${r.failureMode || '-'}</td>
+                            <td class="p-2 text-slate-600">${r.effect || '-'}</td>
+                            <td class="p-2 text-center font-bold text-slate-700">${r.severity || '-'}</td>
+                            <td class="p-2 text-slate-600">${r.cause || '-'}</td>
+                            <td class="p-2 text-center font-bold text-slate-700">${r.occurrence || '-'}</td>
+                            <td class="p-2 text-slate-500 text-[11px]">${[r.controlPrevention, r.controlDetection].filter(Boolean).join(' / ') || '-'}</td>
+                            <td class="p-2 text-center font-bold text-slate-700">${r.detection || '-'}</td>
+                            <td class="p-2 text-center"><span class="px-2 py-0.5 rounded-lg text-[11px] ${rpnClass}">${r.rpn || '-'}</span></td>
+                            <td class="p-2 text-slate-600 text-[11px]">${r.recommendedAction || '-'}</td>
+                        </tr>
+                    `;
+                }).join('');
+            },
+
+            _filterPfmeaTable(sheetId) {
+                const company = this.companies.find(c => c.id === this.activeCompanyId);
+                const sheet = company?.memory?.parsedFmeaSheets?.find(s => s.id === sheetId);
+                if (!sheet) return;
+
+                const stepFilter = document.getElementById('_pfmea-filter-step')?.value || '';
+                const highRpnOnly = document.getElementById('_pfmea-filter-highrpn')?.checked || false;
+
+                let filtered = sheet.rows;
+                if (stepFilter) filtered = filtered.filter(r => r.processStep === stepFilter);
+                if (highRpnOnly) filtered = filtered.filter(r => r.rpn > 100);
+
+                const tbody = document.getElementById('_pfmea-tbody');
+                if (tbody) tbody.innerHTML = this._renderPfmeaTableRows(filtered);
+                const countEl = document.getElementById('_pfmea-filter-count');
+                if (countEl) countEl.textContent = `${filtered.length} satır gösteriliyor`;
             },
 
             toggleAddUserForm() {
