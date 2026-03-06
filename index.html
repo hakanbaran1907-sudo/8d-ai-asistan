@@ -749,7 +749,7 @@
                         processes: [],
                         departments: ['Üretim', 'Kalite', 'Mühendislik'],
                         facilityLocations: ['Merkez Fabrika'],
-                        memory: { past8D: [], fmeaRecords: [], lessonsLearned: [], documents: [], parsedFmeaSheets: [] }
+                        memory: { past8D: [], fmeaRecords: [], lessonsLearned: [], documents: [], parsedFmeaSheets: [], parsedLLSheets: [], past8DRecords: [] }
                     };
                     this.companies.push(defaultCompany);
                     this.saveCompanies();
@@ -878,8 +878,9 @@
                         };
                         changed = true;
                     }
-                    if (!company.memory.parsedFmeaSheets) {
-                        company.memory.parsedFmeaSheets = [];
+                    if (!company.memory.parsedFmeaSheets) { company.memory.parsedFmeaSheets = []; changed = true; }
+                    if (!company.memory.parsedLLSheets) { company.memory.parsedLLSheets = []; changed = true; }
+                    if (!company.memory.past8DRecords) { company.memory.past8DRecords = [];
                         changed = true;
                     }
                 });
@@ -1238,121 +1239,258 @@
                                     </div>
                                 </div>
                                 <!-- Corporate Memory -->
-                                <div id="ch-content-memory" class="ch-content-section hidden space-y-8">
-                                    <div class="border-b border-slate-100 pb-4">
-                                        <h3 class="text-2xl font-black text-slate-800">Kurumsal Hafıza (Geçmiş Kayıtlar)</h3>
-                                        <p class="text-sm text-slate-500 mt-1">Firmanızın geçmişteki kritik FMEA (Hata Türü ve Etkileri Analizi) ve Öğrenilmiş Dersler (Lessons Learned) kayıtlarını buraya ekleyin. Yapay Zeka yeni sorunları çözerken bu tecrübeleri dikkate alacaktır.</p>
+                                <div id="ch-content-memory" class="ch-content-section hidden">
+                                    <div class="border-b border-slate-100 pb-4 mb-5">
+                                        <h3 class="text-2xl font-black text-slate-800">Kurumsal Hafıza</h3>
+                                        <p class="text-sm text-slate-500 mt-1">Firmanızın FMEA, Lessons Learned ve geçmiş 8D kayıtlarını yönetin. AI analizleri tüm bu verileri kullanır.</p>
                                     </div>
 
-                                    <!-- PFMEA Excel Upload Card -->
-                                    <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-                                        <h4 class="font-bold text-slate-700 text-lg mb-1 flex items-center gap-2">
-                                            <i class="fa-solid fa-file-excel text-green-600"></i> PFMEA / FMEA Excel Yükle
-                                            <span class="bg-green-100 text-green-700 text-[10px] font-black px-2 py-0.5 rounded-lg uppercase tracking-widest ml-2">Yeni</span>
-                                        </h4>
-                                        <p class="text-xs text-slate-400 mb-4">Mevcut PFMEA Excel dosyanızı yükleyin. AI analizlerinde öncelikli olarak kullanılacaktır.</p>
+                                    <!-- Memory Sub-tabs -->
+                                    <div class="bg-slate-100 p-1 rounded-xl flex gap-1 mb-6 flex-wrap">
+                                        <button onclick="app.switchMemoryTab('fmea')" id="mem-tab-fmea"
+                                            class="px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 bg-white text-slate-800 shadow-md ring-1 ring-slate-200/60">
+                                            <i class="fa-solid fa-table text-orange-500"></i> FMEA
+                                        </button>
+                                        <button onclick="app.switchMemoryTab('ll')" id="mem-tab-ll"
+                                            class="px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 text-slate-400 hover:text-slate-600 hover:bg-white/50">
+                                            <i class="fa-solid fa-graduation-cap text-teal-400"></i> Lessons Learned
+                                        </button>
+                                        <button onclick="app.switchMemoryTab('records')" id="mem-tab-records"
+                                            class="px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 text-slate-400 hover:text-slate-600 hover:bg-white/50">
+                                            <i class="fa-solid fa-database text-emerald-400"></i> 8D Kayıtları
+                                        </button>
+                                        <button onclick="app.switchMemoryTab('docs')" id="mem-tab-docs"
+                                            class="px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 text-slate-400 hover:text-slate-600 hover:bg-white/50">
+                                            <i class="fa-solid fa-folder-open text-indigo-400"></i> Dokümanlar
+                                        </button>
+                                    </div>
 
-                                        <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-4">
-                                            <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Excel Dosyası</label>
-                                            <div class="flex gap-3 items-center flex-wrap mb-3">
-                                                <input type="file" id="pfmea-file-input" accept=".xlsx,.xls" class="hidden" onchange="app.handlePfmeaUpload(event)">
-                                                <button onclick="document.getElementById('pfmea-file-input').click()"
-                                                    class="bg-green-50 hover:bg-green-100 text-green-700 border border-green-200 px-4 py-2.5 rounded-lg text-sm font-bold transition flex items-center gap-2 shrink-0">
-                                                    <i class="fa-solid fa-file-excel"></i> Excel Seç
+                                    <!-- ==================== TAB 1: FMEA ==================== -->
+                                    <div id="mem-content-fmea" class="mem-content-section space-y-5">
+                                        <!-- FMEA Excel Upload -->
+                                        <div class="border-2 border-dashed border-green-200 rounded-2xl p-5 bg-green-50/30 hover:border-green-300 transition">
+                                            <h4 class="font-bold text-slate-700 text-base mb-1 flex items-center gap-2">
+                                                <i class="fa-solid fa-file-excel text-green-600"></i> PFMEA / FMEA Excel Yükle
+                                            </h4>
+                                            <p class="text-xs text-slate-400 mb-4">Excel dosyanızı yükleyin, tüm sheet'ler otomatik parse edilir.</p>
+
+                                            <div class="bg-white p-4 rounded-xl border border-slate-200 mb-4">
+                                                <div class="flex gap-3 items-center flex-wrap mb-3">
+                                                    <input type="file" id="pfmea-file-input" accept=".xlsx,.xls" class="hidden" onchange="app.handlePfmeaUpload(event)">
+                                                    <button onclick="document.getElementById('pfmea-file-input').click()"
+                                                        class="bg-green-50 hover:bg-green-100 text-green-700 border border-green-200 px-4 py-2.5 rounded-lg text-sm font-bold transition flex items-center gap-2 shrink-0">
+                                                        <i class="fa-solid fa-file-excel"></i> Excel Seç
+                                                    </button>
+                                                    <span id="pfmea-file-name" class="text-sm text-slate-400 italic truncate min-w-0">Dosya seçilmedi</span>
+                                                </div>
+
+                                                <div id="pfmea-sheet-selector" class="hidden mb-3"></div>
+
+                                                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Proses ile Eşleştir <span class="font-normal normal-case text-slate-400">(opsiyonel)</span></label>
+                                                <select id="pfmea-process-link" style="width:100%;box-sizing:border-box;" class="px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-green-400 mb-3">
+                                                    <option value="">-- Proses seçin (tümü için boş bırakın) --</option>
+                                                </select>
+
+                                                <button onclick="app.saveParsedFmea()" style="width:100%;box-sizing:border-box;"
+                                                    class="bg-green-600 text-white font-bold py-2.5 rounded-lg hover:bg-green-700 transition text-sm">
+                                                    <i class="fa-solid fa-save mr-1"></i> Tüm Sheet'leri Kaydet
                                                 </button>
-                                                <span id="pfmea-file-name" class="text-sm text-slate-400 italic truncate min-w-0">Dosya seçilmedi</span>
                                             </div>
 
-                                            <div id="pfmea-sheet-selector" class="hidden mb-3"></div>
+                                            <div id="memory-list-pfmea-sheets" class="space-y-3 max-h-72 overflow-y-auto pr-1"></div>
+                                        </div>
 
-                                            <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Proses ile Eşleştir <span class="font-normal normal-case text-slate-400">(opsiyonel)</span></label>
-                                            <select id="pfmea-process-link" style="width:100%;box-sizing:border-box;" class="px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-green-400 mb-3">
-                                                <option value="">-- Proses seçin (tümü için boş bırakın) --</option>
-                                            </select>
-
-                                            <button onclick="app.saveParsedFmea()" style="width:100%;box-sizing:border-box;"
-                                                class="bg-green-600 text-white font-bold py-2.5 rounded-lg hover:bg-green-700 transition text-sm">
-                                                PFMEA'yı Kaydet
+                                        <!-- FMEA Manuel Giriş (Collapsible) -->
+                                        <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+                                            <button onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('i.fa-chevron-down').classList.toggle('rotate-180')"
+                                                class="w-full px-5 py-3.5 flex items-center justify-between hover:bg-slate-50 transition">
+                                                <span class="font-bold text-slate-700 flex items-center gap-2">
+                                                    <i class="fa-solid fa-plus-circle text-orange-500"></i> Manuel FMEA Kaydı Ekle
+                                                </span>
+                                                <i class="fa-solid fa-chevron-down text-slate-400 text-xs transition-transform"></i>
                                             </button>
-                                        </div>
-
-                                        <div id="memory-list-pfmea-sheets" class="space-y-3 max-h-72 overflow-y-auto pr-1"></div>
-                                    </div>
-
-                                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                                        <!-- FMEA Records -->
-                                        <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex flex-col h-full min-w-0">
-                                            <h4 class="font-bold text-slate-700 text-lg mb-4 flex items-center gap-2">
-                                                <i class="fa-solid fa-table border-slate-200 text-orange-500"></i> Mevcut FMEA Kritik Kayıtları
-                                            </h4>
-                                            
-                                            <!-- FMEA Add Form -->
-                                            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-4">
-                                                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Proses</label>
-                                                <input type="text" id="new-fmea-process" style="width:100%;box-sizing:border-box;" class="px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-400 transition mb-3" placeholder="Örn: Montaj">
-                                                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Hata Modu</label>
-                                                <input type="text" id="new-fmea-failure" style="width:100%;box-sizing:border-box;" class="px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-400 transition mb-3" placeholder="Örn: Vida Eksik">
-                                                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Mevcut Kontroller</label>
-                                                <textarea id="new-fmea-controls" rows="2" style="width:100%;box-sizing:border-box;" class="px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-400 resize-none transition mb-3" placeholder="Örn: Kamera ile görsel kontrol"></textarea>
-                                                <button onclick="app.addFmeaRecord()" style="width:100%;box-sizing:border-box;" class="bg-orange-600 text-white font-bold py-2.5 rounded-lg hover:bg-orange-700 transition text-sm">Kayıt Ekle</button>
+                                            <div class="hidden px-5 pb-5">
+                                                <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                                                    <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Proses</label>
+                                                    <input type="text" id="new-fmea-process" style="width:100%;box-sizing:border-box;" class="px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-400 transition mb-3" placeholder="Örn: Montaj">
+                                                    <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Hata Modu</label>
+                                                    <input type="text" id="new-fmea-failure" style="width:100%;box-sizing:border-box;" class="px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-400 transition mb-3" placeholder="Örn: Vida Eksik">
+                                                    <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Mevcut Kontroller</label>
+                                                    <textarea id="new-fmea-controls" rows="2" style="width:100%;box-sizing:border-box;" class="px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-400 resize-none transition mb-3" placeholder="Örn: Kamera ile görsel kontrol"></textarea>
+                                                    <button onclick="app.addFmeaRecord()" style="width:100%;box-sizing:border-box;" class="bg-orange-600 text-white font-bold py-2.5 rounded-lg hover:bg-orange-700 transition text-sm">Kayıt Ekle</button>
+                                                </div>
                                             </div>
-
-                                            <!-- FMEA List -->
-                                            <div id="memory-list-fmea" class="flex-grow space-y-3 overflow-y-auto max-h-96 pr-1"></div>
                                         </div>
 
-                                        <!-- Lessons Learned -->
-                                        <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex flex-col h-full min-w-0">
-                                            <h4 class="font-bold text-slate-700 text-lg mb-4 flex items-center gap-2">
-                                                <i class="fa-solid fa-graduation-cap text-teal-500"></i> Öğrenilmiş Dersler (Lessons Learned)
-                                            </h4>
-                                            
-                                            <!-- LL Add Form -->
-                                            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-4">
-                                                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Konu / Problem</label>
-                                                <input type="text" id="new-ll-topic" style="width:100%;box-sizing:border-box;" class="px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-400 transition mb-3" placeholder="Örn: Boya akıntı hatası">
-                                                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Çıkarılan Ders</label>
-                                                <textarea id="new-ll-lesson" rows="3" style="width:100%;box-sizing:border-box;" class="px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-400 resize-none transition mb-3" placeholder="Örn: Basınç sensörü eklendi, manuel ayar iptal edildi"></textarea>
-                                                <button onclick="app.addLessonLearned()" style="width:100%;box-sizing:border-box;" class="bg-teal-600 text-white font-bold py-2.5 rounded-lg hover:bg-teal-700 transition text-sm">Ders Ekle</button>
-                                            </div>
-
-                                            <!-- LL List -->
-                                            <div id="memory-list-ll" class="flex-grow space-y-3 overflow-y-auto max-h-96 pr-1"></div>
-                                        </div>
+                                        <!-- FMEA Manuel Kayıt Listesi -->
+                                        <div id="memory-list-fmea" class="space-y-3 max-h-96 overflow-y-auto pr-1"></div>
                                     </div>
 
-                                    <!-- LL Pool (Auto from closed reports) -->
-                                    <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-                                        <div class="flex items-center justify-between mb-4">
-                                            <h4 class="font-bold text-slate-700 text-lg flex items-center gap-2">
-                                                <i class="fa-solid fa-database text-emerald-500"></i> 8D Havuzu
-                                                <span class="text-sm font-normal text-slate-400">(Kapatılan Raporlardan Otomatik)</span>
+                                    <!-- ==================== TAB 2: LESSONS LEARNED ==================== -->
+                                    <div id="mem-content-ll" class="mem-content-section hidden space-y-5">
+                                        <!-- LL Excel Upload -->
+                                        <div class="border-2 border-dashed border-teal-200 rounded-2xl p-5 bg-teal-50/30 hover:border-teal-300 transition">
+                                            <h4 class="font-bold text-slate-700 text-base mb-1 flex items-center gap-2">
+                                                <i class="fa-solid fa-file-excel text-teal-600"></i> Lessons Learned Excel Yükle
                                             </h4>
-                                            <span id="ll-pool-count" class="bg-emerald-100 text-emerald-700 text-xs font-black px-2 py-1 rounded-lg hidden"></span>
-                                        </div>
-                                        <div id="memory-list-pool" class="space-y-3 max-h-[520px] overflow-y-auto pr-1"></div>
-                                    </div>
+                                            <p class="text-xs text-slate-400 mb-4">LL Excel dosyanızı yükleyin. Konu, ders, kök neden gibi sütunlar otomatik algılanır.</p>
 
-                                    <!-- Document Library -->
-                                    <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-                                        <h4 class="font-bold text-slate-700 text-lg mb-1 flex items-center gap-2">
-                                            <i class="fa-solid fa-folder-open text-indigo-500"></i> Doküman Kütüphanesi
-                                        </h4>
-                                        <p class="text-xs text-slate-400 mb-4">PDF, Excel, TXT gibi dokümanlarınızı yükleyin. AI analizleri bu dokümanların özetlerini bağlam olarak kullanacak.</p>
-                                        <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-4">
-                                            <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Dosya</label>
-                                            <div class="flex gap-3 items-center flex-wrap mb-3">
-                                                <input type="file" id="doc-file-input" accept=".txt,.pdf,.xlsx,.xls,.docx,.doc" class="hidden" onchange="app.handleDocumentUpload(event)">
-                                                <button onclick="document.getElementById('doc-file-input').click()" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 px-4 py-2.5 rounded-lg text-sm font-bold transition flex items-center gap-2 shrink-0">
-                                                    <i class="fa-solid fa-upload"></i> Dosya Seç
+                                            <div class="bg-white p-4 rounded-xl border border-slate-200 mb-4">
+                                                <div class="flex gap-3 items-center flex-wrap mb-3">
+                                                    <input type="file" id="ll-file-input" accept=".xlsx,.xls" class="hidden" onchange="app.handleLLExcelUpload(event)">
+                                                    <button onclick="document.getElementById('ll-file-input').click()"
+                                                        class="bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-200 px-4 py-2.5 rounded-lg text-sm font-bold transition flex items-center gap-2 shrink-0">
+                                                        <i class="fa-solid fa-file-excel"></i> Excel Seç
+                                                    </button>
+                                                    <span id="ll-file-name" class="text-sm text-slate-400 italic truncate min-w-0">Dosya seçilmedi</span>
+                                                </div>
+
+                                                <div id="ll-sheet-selector" class="hidden mb-3"></div>
+
+                                                <button onclick="app.saveParsedLL()" style="width:100%;box-sizing:border-box;"
+                                                    class="bg-teal-600 text-white font-bold py-2.5 rounded-lg hover:bg-teal-700 transition text-sm">
+                                                    <i class="fa-solid fa-save mr-1"></i> Tüm Sheet'leri Kaydet
                                                 </button>
-                                                <span id="doc-file-name" class="text-sm text-slate-400 italic truncate min-w-0">Dosya seçilmedi</span>
                                             </div>
-                                            <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Özet / Açıklama <span class="text-slate-400 font-normal normal-case">(txt için otomatik, max 2000 karakter)</span></label>
-                                            <textarea id="doc-summary-input" rows="3" style="width:100%;box-sizing:border-box;" class="px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 resize-none transition mb-3" placeholder="Bu dokümanın içerdiği kritik bilgilerin özeti..."></textarea>
-                                            <button onclick="app.saveDocument()" style="width:100%;box-sizing:border-box;" class="bg-indigo-600 text-white font-bold py-2.5 rounded-lg hover:bg-indigo-700 transition text-sm">Kaydet</button>
+
+                                            <div id="memory-list-ll-sheets" class="space-y-3 max-h-72 overflow-y-auto pr-1"></div>
                                         </div>
-                                        <div id="memory-list-docs" class="space-y-3 max-h-72 overflow-y-auto pr-1"></div>
+
+                                        <!-- LL Manuel Giriş (Collapsible) -->
+                                        <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+                                            <button onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('i.fa-chevron-down').classList.toggle('rotate-180')"
+                                                class="w-full px-5 py-3.5 flex items-center justify-between hover:bg-slate-50 transition">
+                                                <span class="font-bold text-slate-700 flex items-center gap-2">
+                                                    <i class="fa-solid fa-plus-circle text-teal-500"></i> Manuel Ders Kaydı Ekle
+                                                </span>
+                                                <i class="fa-solid fa-chevron-down text-slate-400 text-xs transition-transform"></i>
+                                            </button>
+                                            <div class="hidden px-5 pb-5">
+                                                <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                                                    <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Konu / Problem</label>
+                                                    <input type="text" id="new-ll-topic" style="width:100%;box-sizing:border-box;" class="px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-400 transition mb-3" placeholder="Örn: Boya akıntı hatası">
+                                                    <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Çıkarılan Ders</label>
+                                                    <textarea id="new-ll-lesson" rows="3" style="width:100%;box-sizing:border-box;" class="px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-400 resize-none transition mb-3" placeholder="Örn: Basınç sensörü eklendi, manuel ayar iptal edildi"></textarea>
+                                                    <button onclick="app.addLessonLearned()" style="width:100%;box-sizing:border-box;" class="bg-teal-600 text-white font-bold py-2.5 rounded-lg hover:bg-teal-700 transition text-sm">Ders Ekle</button>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- LL Manuel Kayıt Listesi -->
+                                        <div id="memory-list-ll" class="space-y-3 max-h-96 overflow-y-auto pr-1"></div>
+
+                                        <!-- 8D Havuzu (Otomatik) -->
+                                        <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+                                            <div class="flex items-center justify-between mb-4">
+                                                <h4 class="font-bold text-slate-700 text-base flex items-center gap-2">
+                                                    <i class="fa-solid fa-robot text-emerald-500"></i> 8D Havuzu
+                                                    <span class="text-xs font-normal text-slate-400">(Kapatılan raporlardan otomatik)</span>
+                                                </h4>
+                                                <span id="ll-pool-count" class="bg-emerald-100 text-emerald-700 text-xs font-black px-2 py-1 rounded-lg hidden"></span>
+                                            </div>
+                                            <div id="memory-list-pool" class="space-y-3 max-h-[520px] overflow-y-auto pr-1"></div>
+                                        </div>
+                                    </div>
+
+                                    <!-- ==================== TAB 3: 8D KAYITLARI ==================== -->
+                                    <div id="mem-content-records" class="mem-content-section hidden space-y-5">
+                                        <!-- 8D Excel/PDF Upload -->
+                                        <div class="border-2 border-dashed border-emerald-200 rounded-2xl p-5 bg-emerald-50/30 hover:border-emerald-300 transition">
+                                            <h4 class="font-bold text-slate-700 text-base mb-1 flex items-center gap-2">
+                                                <i class="fa-solid fa-file-import text-emerald-600"></i> Geçmiş 8D Raporu Yükle
+                                            </h4>
+                                            <p class="text-xs text-slate-400 mb-4">Geçmiş 8D raporlarınızı Excel veya PDF olarak yükleyin.</p>
+
+                                            <div class="bg-white p-4 rounded-xl border border-slate-200 mb-4">
+                                                <div class="flex gap-3 items-center flex-wrap mb-3">
+                                                    <input type="file" id="past8d-file-input" accept=".xlsx,.xls,.pdf" class="hidden" onchange="app.handlePast8DUpload(event)">
+                                                    <button onclick="document.getElementById('past8d-file-input').click()"
+                                                        class="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 px-4 py-2.5 rounded-lg text-sm font-bold transition flex items-center gap-2 shrink-0">
+                                                        <i class="fa-solid fa-file-import"></i> Dosya Seç (Excel/PDF)
+                                                    </button>
+                                                    <span id="past8d-file-name" class="text-sm text-slate-400 italic truncate min-w-0">Dosya seçilmedi</span>
+                                                </div>
+
+                                                <div id="past8d-sheet-selector" class="hidden mb-3"></div>
+
+                                                <!-- PDF Summary (shown only for PDF files) -->
+                                                <div id="past8d-pdf-summary" class="hidden mb-3">
+                                                    <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Rapor Özeti</label>
+                                                    <textarea id="past8d-summary-input" rows="3" style="width:100%;box-sizing:border-box;" class="px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 resize-none transition" placeholder="8D raporunun kısa özeti..."></textarea>
+                                                </div>
+
+                                                <button onclick="app.saveParsed8D()" style="width:100%;box-sizing:border-box;"
+                                                    class="bg-emerald-600 text-white font-bold py-2.5 rounded-lg hover:bg-emerald-700 transition text-sm">
+                                                    <i class="fa-solid fa-save mr-1"></i> Kaydet
+                                                </button>
+                                            </div>
+
+                                            <div id="memory-list-past8d" class="space-y-3 max-h-72 overflow-y-auto pr-1"></div>
+                                        </div>
+
+                                        <!-- 8D Manuel Giriş (Collapsible) -->
+                                        <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+                                            <button onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('i.fa-chevron-down').classList.toggle('rotate-180')"
+                                                class="w-full px-5 py-3.5 flex items-center justify-between hover:bg-slate-50 transition">
+                                                <span class="font-bold text-slate-700 flex items-center gap-2">
+                                                    <i class="fa-solid fa-plus-circle text-emerald-500"></i> Manuel 8D Kaydı Ekle
+                                                </span>
+                                                <i class="fa-solid fa-chevron-down text-slate-400 text-xs transition-transform"></i>
+                                            </button>
+                                            <div class="hidden px-5 pb-5">
+                                                <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                                                        <div>
+                                                            <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Rapor No</label>
+                                                            <input type="text" id="new-8d-reportno" style="width:100%;box-sizing:border-box;" class="px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-500/30 transition" placeholder="Örn: 8D-2025-001">
+                                                        </div>
+                                                        <div>
+                                                            <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Tarih</label>
+                                                            <input type="date" id="new-8d-date" style="width:100%;box-sizing:border-box;" class="px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-500/30 transition">
+                                                        </div>
+                                                    </div>
+                                                    <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Problem Tanımı</label>
+                                                    <textarea id="new-8d-problem" rows="2" style="width:100%;box-sizing:border-box;" class="px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-500/30 resize-none transition mb-3" placeholder="Örn: Montaj hattında vida eksik"></textarea>
+                                                    <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Kök Neden</label>
+                                                    <input type="text" id="new-8d-rootcause" style="width:100%;box-sizing:border-box;" class="px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-500/30 transition mb-3" placeholder="Örn: Tork tabancası kalibrasyon hatası">
+                                                    <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Alınan Aksiyonlar</label>
+                                                    <textarea id="new-8d-actions" rows="2" style="width:100%;box-sizing:border-box;" class="px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-500/30 resize-none transition mb-3" placeholder="Örn: Günlük kalibrasyon kontrolü eklendi"></textarea>
+                                                    <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Durum</label>
+                                                    <select id="new-8d-status" style="width:100%;box-sizing:border-box;" class="px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-500/30 transition mb-3">
+                                                        <option value="Kapalı">Kapalı</option>
+                                                        <option value="Açık">Açık</option>
+                                                    </select>
+                                                    <button onclick="app.addManualPast8D()" style="width:100%;box-sizing:border-box;" class="bg-emerald-600 text-white font-bold py-2.5 rounded-lg hover:bg-emerald-700 transition text-sm">Kayıt Ekle</button>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- 8D Manuel Kayıt Listesi -->
+                                        <div id="memory-list-past8d-manual" class="space-y-3 max-h-96 overflow-y-auto pr-1"></div>
+                                    </div>
+
+                                    <!-- ==================== TAB 4: DOKÜMANLAR ==================== -->
+                                    <div id="mem-content-docs" class="mem-content-section hidden space-y-5">
+                                        <div class="border-2 border-dashed border-indigo-200 rounded-2xl p-5 bg-indigo-50/30 hover:border-indigo-300 transition">
+                                            <h4 class="font-bold text-slate-700 text-base mb-1 flex items-center gap-2">
+                                                <i class="fa-solid fa-folder-open text-indigo-600"></i> Doküman Kütüphanesi
+                                            </h4>
+                                            <p class="text-xs text-slate-400 mb-4">PDF, Excel, TXT gibi dokümanlarınızı yükleyin. AI analizleri bu dokümanların özetlerini bağlam olarak kullanacak.</p>
+                                            <div class="bg-white p-4 rounded-xl border border-slate-200 mb-4">
+                                                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Dosya</label>
+                                                <div class="flex gap-3 items-center flex-wrap mb-3">
+                                                    <input type="file" id="doc-file-input" accept=".txt,.pdf,.xlsx,.xls,.docx,.doc" class="hidden" onchange="app.handleDocumentUpload(event)">
+                                                    <button onclick="document.getElementById('doc-file-input').click()" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 px-4 py-2.5 rounded-lg text-sm font-bold transition flex items-center gap-2 shrink-0">
+                                                        <i class="fa-solid fa-upload"></i> Dosya Seç
+                                                    </button>
+                                                    <span id="doc-file-name" class="text-sm text-slate-400 italic truncate min-w-0">Dosya seçilmedi</span>
+                                                </div>
+                                                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Özet / Açıklama <span class="text-slate-400 font-normal normal-case">(txt için otomatik, max 2000 karakter)</span></label>
+                                                <textarea id="doc-summary-input" rows="3" style="width:100%;box-sizing:border-box;" class="px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 resize-none transition mb-3" placeholder="Bu dokümanın içerdiği kritik bilgilerin özeti..."></textarea>
+                                                <button onclick="app.saveDocument()" style="width:100%;box-sizing:border-box;" class="bg-indigo-600 text-white font-bold py-2.5 rounded-lg hover:bg-indigo-700 transition text-sm">Kaydet</button>
+                                            </div>
+                                            <div id="memory-list-docs" class="space-y-3 max-h-72 overflow-y-auto pr-1"></div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -1401,9 +1539,42 @@
                     this.renderProcessCards();
                     this.renderCompanyDefinitions();
                 } else if (tabName === 'memory') {
+                    this.switchMemoryTab(this._memoryTab || 'fmea');
+                }
+            },
+
+            _memoryTab: 'fmea',
+
+            switchMemoryTab(tabName) {
+                this._memoryTab = tabName;
+                ['fmea', 'll', 'records', 'docs'].forEach(t => {
+                    const btn = document.getElementById('mem-tab-' + t);
+                    if (btn) {
+                        btn.className = (t === tabName)
+                            ? 'px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 bg-white text-slate-800 shadow-md ring-1 ring-slate-200/60'
+                            : 'px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 text-slate-400 hover:text-slate-600 hover:bg-white/50';
+                    }
+                    const content = document.getElementById('mem-content-' + t);
+                    if (content) {
+                        content.classList.toggle('hidden', t !== tabName);
+                        if (t === tabName) content.classList.add('animate-fade-in');
+                    }
+                });
+
+                const company = this.companies.find(c => c.id === this.activeCompanyId);
+                if (!company) return;
+
+                if (tabName === 'fmea') {
                     this.renderCorporateMemory();
-                    this.renderDocumentList();
+                    this.renderPfmeaSheetsCard();
+                } else if (tabName === 'll') {
+                    this.renderLLManualList();
+                    this.renderLLSheetsCard();
                     this.renderLLPool();
+                } else if (tabName === 'records') {
+                    this.renderPast8DList();
+                } else if (tabName === 'docs') {
+                    this.renderDocumentList();
                 }
             },
 
@@ -2137,7 +2308,7 @@
                     departments: ['Üretim', 'Kalite', 'Mühendislik'],
                     facilityLocations: ['Merkez Fabrika'],
                     shifts: [],
-                    memory: { past8D: [], fmeaRecords: [], lessonsLearned: [], documents: [], parsedFmeaSheets: [] },
+                    memory: { past8D: [], fmeaRecords: [], lessonsLearned: [], documents: [], parsedFmeaSheets: [], parsedLLSheets: [], past8DRecords: [] },
                     users: [{
                         id: userId,
                         name: adminName,
@@ -7937,11 +8108,11 @@ LÜTFEN SADECE AŞAĞIDAKİ JSON FORMATINDA YANIT VER:
                 const company = this.companies.find(c => c.id === this.activeCompanyId);
                 if (!company || !company.memory) return;
 
-                // Render FMEA
+                // Render FMEA Manuel Kayıtları
                 const fmeaContainer = document.getElementById('memory-list-fmea');
                 if (fmeaContainer) {
                     if (company.memory.fmeaRecords.length === 0) {
-                        fmeaContainer.innerHTML = '<p class="text-xs text-slate-400 italic text-center py-8">Kayıtlı FMEA verisi bulunamadı.</p>';
+                        fmeaContainer.innerHTML = '<p class="text-xs text-slate-400 italic text-center py-4">Kayıtlı FMEA verisi bulunamadı.</p>';
                     } else {
                         fmeaContainer.innerHTML = company.memory.fmeaRecords.map((item, index) => `
                             <div class="bg-white border border-slate-200 p-3 rounded-xl hover:shadow-md transition group relative">
@@ -7956,24 +8127,6 @@ LÜTFEN SADECE AŞAĞIDAKİ JSON FORMATINDA YANIT VER:
                     }
                 }
 
-                // Render Lessons Learned
-                const llContainer = document.getElementById('memory-list-ll');
-                if (llContainer) {
-                    if (company.memory.lessonsLearned.length === 0) {
-                        llContainer.innerHTML = '<p class="text-xs text-slate-400 italic text-center py-8">Öğrenilmiş ders kaydı bulunamadı.</p>';
-                    } else {
-                        llContainer.innerHTML = company.memory.lessonsLearned.map((item, index) => `
-                            <div class="bg-white border border-slate-200 p-3 rounded-xl hover:shadow-md transition group relative">
-                                <button onclick="app.removeLessonLearned(${index})" class="absolute top-2 right-2 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition">
-                                    <i class="fa-solid fa-trash-can text-sm"></i>
-                                </button>
-                                <div class="text-[10px] font-black text-teal-600 uppercase tracking-widest mb-1">Konu: ${item.topic}</div>
-                                <div class="text-sm text-slate-700 mt-2 font-medium leading-relaxed">${item.lesson}</div>
-                            </div>
-                        `).join('');
-                    }
-                }
-
                 // PFMEA proses dropdown'ı doldur
                 const processSelect = document.getElementById('pfmea-process-link');
                 if (processSelect) {
@@ -7982,8 +8135,29 @@ LÜTFEN SADECE AŞAĞIDAKİ JSON FORMATINDA YANIT VER:
                         processList.map(p => `<option value="${typeof p === 'string' ? p : p.name}">${typeof p === 'string' ? p : p.name}</option>`).join('');
                 }
 
-                // PFMEA sheets listesi
                 this.renderPfmeaSheetsCard();
+            },
+
+            renderLLManualList() {
+                const company = this.companies.find(c => c.id === this.activeCompanyId);
+                if (!company || !company.memory) return;
+
+                const llContainer = document.getElementById('memory-list-ll');
+                if (!llContainer) return;
+
+                if (company.memory.lessonsLearned.length === 0) {
+                    llContainer.innerHTML = '<p class="text-xs text-slate-400 italic text-center py-4">Öğrenilmiş ders kaydı bulunamadı.</p>';
+                } else {
+                    llContainer.innerHTML = company.memory.lessonsLearned.map((item, index) => `
+                        <div class="bg-white border border-slate-200 p-3 rounded-xl hover:shadow-md transition group relative">
+                            <button onclick="app.removeLessonLearned(${index})" class="absolute top-2 right-2 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition">
+                                <i class="fa-solid fa-trash-can text-sm"></i>
+                            </button>
+                            <div class="text-[10px] font-black text-teal-600 uppercase tracking-widest mb-1">Konu: ${item.topic}</div>
+                            <div class="text-sm text-slate-700 mt-2 font-medium leading-relaxed">${item.lesson}</div>
+                        </div>
+                    `).join('');
+                }
             },
 
             renderLLPool() {
@@ -8098,7 +8272,7 @@ LÜTFEN SADECE AŞAĞIDAKİ JSON FORMATINDA YANIT VER:
                     if (!company.memory.lessonsLearned) company.memory.lessonsLearned = [];
                     company.memory.lessonsLearned.push({ topic, lesson });
                     this.saveCompanies();
-                    this.renderCorporateMemory();
+                    this.renderLLManualList();
 
                     document.getElementById('new-ll-topic').value = '';
                     document.getElementById('new-ll-lesson').value = '';
@@ -8110,7 +8284,7 @@ LÜTFEN SADECE AŞAĞIDAKİ JSON FORMATINDA YANIT VER:
                 if (company && company.memory.lessonsLearned) {
                     company.memory.lessonsLearned.splice(index, 1);
                     this.saveCompanies();
-                    this.renderCorporateMemory();
+                    this.renderLLManualList();
                 }
             },
 
@@ -8226,17 +8400,31 @@ LÜTFEN SADECE AŞAĞIDAKİ JSON FORMATINDA YANIT VER:
                 const container = document.getElementById('pfmea-sheet-selector');
                 if (!container) return;
                 const sheets = workbook.SheetNames;
+
+                // Her sheet'in satır sayısını hesapla
+                const sheetInfos = sheets.map(name => {
+                    const rows = this._parseSheet(workbook, name);
+                    return { name, rowCount: rows.length };
+                });
+                const totalRows = sheetInfos.reduce((sum, s) => sum + s.rowCount, 0);
+                const validSheets = sheetInfos.filter(s => s.rowCount > 0).length;
+
                 container.innerHTML = `
-                    <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Sheet Seçin (${sheets.length} sheet bulundu)</label>
-                    <div class="flex flex-wrap gap-2 mb-3">
-                        ${sheets.map((name, i) => `
-                            <button onclick="app._selectPfmeaSheet('${name.replace(/'/g, "\\\\'")}')" id="pfmea-sheet-btn-${i}"
-                                class="px-3 py-1.5 text-xs font-bold border rounded-lg transition ${i === 0 ? 'bg-green-100 border-green-400 text-green-700' : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-green-300'}">
-                                ${name}
-                            </button>
-                        `).join('')}
+                    <div class="bg-green-50 border border-green-200 rounded-xl p-3 mb-3">
+                        <div class="flex items-center gap-2 mb-2">
+                            <i class="fa-solid fa-file-excel text-green-600"></i>
+                            <span class="text-xs font-bold text-green-700">${sheets.length} sheet bulundu · ${validSheets} geçerli · Toplam ${totalRows} satır</span>
+                        </div>
+                        <div class="flex flex-wrap gap-2 mb-3">
+                            ${sheetInfos.map((s, i) => `
+                                <button onclick="app._selectPfmeaSheet('${s.name.replace(/'/g, "\\\\'")}')" id="pfmea-sheet-btn-${i}"
+                                    class="px-3 py-1.5 text-xs font-bold border rounded-lg transition ${s.rowCount > 0 ? 'bg-white border-green-300 text-green-700 hover:bg-green-50' : 'bg-slate-50 border-slate-200 text-slate-400'}">
+                                    ${s.name} <span class="text-[10px] font-normal">(${s.rowCount})</span>
+                                </button>
+                            `).join('')}
+                        </div>
+                        <div id="pfmea-preview-table"></div>
                     </div>
-                    <div id="pfmea-preview-table"></div>
                 `;
                 container.classList.remove('hidden');
                 if (sheets.length > 0) this._selectPfmeaSheet(sheets[0]);
@@ -8257,54 +8445,64 @@ LÜTFEN SADECE AŞAĞIDAKİ JSON FORMATINDA YANIT VER:
                     }
                 });
 
-                const ws = wb.Sheets[sheetName];
-                const rawData = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+                // Sheet'i bağımsız parse et
+                const rows = this._parseSheet(wb, sheetName);
+                this._pendingPfmeaRows = rows;
 
-                if (rawData.length < 2) {
-                    const preview = document.getElementById('pfmea-preview-table');
-                    if (preview) preview.innerHTML = '<p class="text-xs text-red-500 italic">Bu sheet boş veya veri içermiyor.</p>';
+                const preview = document.getElementById('pfmea-preview-table');
+                if (!preview) return;
+
+                if (!rows || rows.length === 0) {
+                    preview.innerHTML = '<p class="text-xs text-red-500 italic">Bu sheet\'te geçerli FMEA verisi bulunamadı.</p>';
                     return;
                 }
 
-                const headerRow = rawData[0].map(h => String(h).toLowerCase().trim());
-                const colMap = this._detectPfmeaColumns(headerRow);
-                const rows = rawData.slice(1)
-                    .map(row => this._mapPfmeaRow(row, colMap))
-                    .filter(r => r.failureMode || r.processStep);
-
-                this._pendingPfmeaRows = rows;
-                this._pendingPfmeaColMap = colMap;
-                this._renderPfmeaPreview(rows, colMap);
+                this._renderPfmeaPreview(rows);
             },
 
             _detectPfmeaColumns(headerRow) {
+                // Geniş keyword listesi — Türkçe/İngilizce/kısaltma varyasyonları
                 const matchers = {
-                    processStep:       ['proses adımı', 'proses', 'process step', 'function', 'fonksiyon', 'operasyon', 'process function', 'proses adı'],
-                    failureMode:       ['hata modu', 'potansiyel hata', 'failure mode', 'potential failure', 'hata türü'],
-                    effect:            ['etkisi', 'hata etkisi', 'effect', 'potential effect', 'etkileri'],
-                    severity:          ['şiddet', 'severity', 'önem derecesi', 'ciddiyet'],
-                    cause:             ['neden', 'hata nedeni', 'cause', 'potential cause', 'sebep'],
-                    occurrence:        ['oluşum', 'occurrence', 'olasılık', 'sıklık'],
-                    controlPrevention: ['önleme kontrolü', 'önleyici kontrol', 'prevention control', 'current controls prevention', 'önleme'],
-                    controlDetection:  ['tespit kontrolü', 'mevcut kontroller', 'detection control', 'current controls detection', 'current process controls', 'mevcut kontrol'],
-                    detection:         ['tespit', 'detection', 'algılama', 'saptama'],
-                    rpn:               ['rpn', 'risk öncelik', 'risk priority', 'risk sayısı', 'rön'],
-                    recommendedAction: ['önerilen aksiyon', 'recommended action', 'tavsiye', 'önerilen faaliyet', 'aksiyon'],
-                    actionResults:     ['aksiyon sonucu', 'action results', 'sonuç', 'revize']
+                    processStep:       ['proses adımı', 'proses adı', 'proses', 'process step', 'function', 'fonksiyon', 'operasyon', 'process function', 'işlem', 'istasyon', 'adım', 'no', 'sıra'],
+                    failureMode:       ['hata modu', 'potansiyel hata', 'failure mode', 'potential failure', 'hata türü', 'olası hata', 'arıza', 'uygunsuzluk', 'hata tanımı', 'hatası'],
+                    effect:            ['etkisi', 'hata etkisi', 'effect', 'potential effect', 'etkileri', 'müşteri etkisi', 'sonuç', 'etki'],
+                    severity:          ['şiddet', 'severity', 'önem derecesi', 'ciddiyet', 'önem', 'ağırlık', 'sev'],
+                    cause:             ['neden', 'hata nedeni', 'cause', 'potential cause', 'sebep', 'kök neden', 'root cause', 'olası neden', 'nedeni'],
+                    occurrence:        ['oluşum', 'occurrence', 'olasılık', 'olasilik', 'sıklık', 'frekans', 'occ', 'görülme'],
+                    controlPrevention: ['önleme kontrolü', 'önleyici kontrol', 'prevention control', 'current controls prevention', 'önleme', 'mevcut önlem', 'kontrol önleme'],
+                    controlDetection:  ['tespit kontrolü', 'mevcut kontroller', 'detection control', 'current controls detection', 'current process controls', 'mevcut kontrol', 'kontrol yöntemi', 'kontrol metodu', 'kontrol', 'muayene'],
+                    detection:         ['tespit', 'tespit etme', 'detection', 'algılama', 'saptama', 'det', 'fark edilebilirlik'],
+                    rpn:               ['rpn', 'rög', 'risk öncelik', 'risk priority', 'risk sayısı', 'rön', 'risk', 'rps'],
+                    recommendedAction: ['önerilen aksiyon', 'recommended action', 'tavsiye', 'önerilen faaliyet', 'aksiyon', 'düzeltici', 'iyileştirme', 'öneri', 'alınacak önlem'],
+                    actionResults:     ['aksiyon sonucu', 'action results', 'revize', 'sonuç', 'tamamlanma', 'durum']
                 };
 
                 const colMap = {};
+                // 1. Tam eşleşme ile ara
                 headerRow.forEach((h, idx) => {
                     for (const [fieldName, keywords] of Object.entries(matchers)) {
                         if (!colMap[fieldName] && keywords.some(kw => h.includes(kw))) {
                             colMap[fieldName] = idx;
                         }
                     }
-                    // Tek harfli S, O, D sütunları (tam eşleşme)
-                    if (!colMap.severity && h === 's') colMap.severity = idx;
-                    if (!colMap.occurrence && h === 'o') colMap.occurrence = idx;
-                    if (!colMap.detection && h === 'd') colMap.detection = idx;
                 });
+                // 2. Tek harfli S, O, D sütunları (tam eşleşme)
+                headerRow.forEach((h, idx) => {
+                    if (!colMap.severity && (h === 's' || h === 'ş')) colMap.severity = idx;
+                    if (!colMap.occurrence && h === 'o') colMap.occurrence = idx;
+                    if (!colMap.detection && (h === 'd' || h === 't')) colMap.detection = idx;
+                });
+                // 3. Sayısal sütun tahmini: S, O, D yanyana 3 tek-harfli veya kısa başlık olabilir
+                if (!colMap.severity || !colMap.occurrence || !colMap.detection) {
+                    headerRow.forEach((h, idx) => {
+                        const clean = h.replace(/[^a-zçğıöşü0-9]/gi, '');
+                        if (clean.length <= 3) {
+                            if (!colMap.severity && (clean === 'ş' || clean === 's' || clean === 'şid' || clean === 'sev')) colMap.severity = idx;
+                            else if (!colMap.occurrence && (clean === 'o' || clean === 'olu' || clean === 'occ')) colMap.occurrence = idx;
+                            else if (!colMap.detection && (clean === 'd' || clean === 't' || clean === 'tes' || clean === 'det')) colMap.detection = idx;
+                        }
+                    });
+                }
                 return colMap;
             },
 
@@ -8338,18 +8536,17 @@ LÜTFEN SADECE AŞAĞIDAKİ JSON FORMATINDA YANIT VER:
                 };
             },
 
-            _renderPfmeaPreview(rows, colMap) {
+            _renderPfmeaPreview(rows) {
                 const container = document.getElementById('pfmea-preview-table');
                 if (!container) return;
-                const mappedCount = Object.keys(colMap).length;
                 const previewRows = rows.slice(0, 5);
+
                 container.innerHTML = `
                     <div class="bg-green-50 border border-green-200 rounded-xl p-3">
                         <div class="flex items-center gap-2 mb-2">
                             <i class="fa-solid fa-circle-check text-green-600 text-sm"></i>
-                            <span class="text-xs font-bold text-green-700">${rows.length} satır tespit edildi · ${mappedCount} sütun eşlendi</span>
+                            <span class="text-xs font-bold text-green-700">${rows.length} satır tespit edildi</span>
                         </div>
-                        ${mappedCount === 0 ? '<p class="text-xs text-amber-600 mb-2">Standart sütun başlıkları bulunamadı. Sütun isimlerini kontrol edin.</p>' : ''}
                         ${previewRows.length > 0 ? `
                         <div class="overflow-x-auto">
                             <table class="w-full text-[11px] mt-1">
@@ -8378,37 +8575,53 @@ LÜTFEN SADECE AŞAĞIDAKİ JSON FORMATINDA YANIT VER:
 
             saveParsedFmea() {
                 const file = this._pendingPfmeaFile;
-                const rows = this._pendingPfmeaRows;
-                const sheetName = this._pendingPfmeaSheetName;
+                const wb = this._pendingPfmeaWorkbook;
 
-                if (!file || !rows || rows.length === 0) {
-                    this._showInfoToast('Lütfen önce geçerli bir Excel dosyası seçin ve sheet seçin.', 'red');
+                if (!file || !wb) {
+                    this._showInfoToast('Lütfen önce geçerli bir Excel dosyası seçin.', 'red');
                     return;
                 }
 
-                const linkedProcess = document.getElementById('pfmea-process-link')?.value || '';
                 const company = this.companies.find(c => c.id === this.activeCompanyId);
                 if (!company) return;
                 if (!company.memory.parsedFmeaSheets) company.memory.parsedFmeaSheets = [];
 
-                // Boyut kontrolü
-                const testCompany = JSON.parse(JSON.stringify(company));
-                testCompany.memory.parsedFmeaSheets.push({ rows });
-                if (JSON.stringify(testCompany).length > 800000) {
-                    this._showInfoToast('Depolama sınırına yaklaşıldı. Eski PFMEA dosyalarını silin.', 'red');
+                // Tüm sheet'leri ayrı ayrı parse et ve kaydet
+                let totalRows = 0;
+                let savedSheets = 0;
+                const linkedProcess = document.getElementById('pfmea-process-link')?.value || '';
+
+                for (const sheetName of wb.SheetNames) {
+                    const sheetRows = this._parseSheet(wb, sheetName);
+                    if (!sheetRows || sheetRows.length === 0) continue;
+
+                    // Boyut kontrolü
+                    const testCompany = JSON.parse(JSON.stringify(company));
+                    testCompany.memory.parsedFmeaSheets.push({ rows: sheetRows });
+                    if (JSON.stringify(testCompany).length > 800000) {
+                        this._showInfoToast('Depolama sınırına yaklaşıldı! ' + savedSheets + ' sheet kaydedildi.', 'red');
+                        break;
+                    }
+
+                    company.memory.parsedFmeaSheets.push({
+                        id: 'pfmea-' + Math.random().toString(36).substr(2, 9),
+                        fileName: file.name,
+                        uploadDate: new Date().toISOString().split('T')[0],
+                        sheetName: sheetName,
+                        processName: linkedProcess,
+                        rowCount: sheetRows.length,
+                        uploadedBy: this.activeUserId || '',
+                        rows: sheetRows
+                    });
+                    totalRows += sheetRows.length;
+                    savedSheets++;
+                }
+
+                if (savedSheets === 0) {
+                    this._showInfoToast('Hiçbir sheet\'te geçerli FMEA verisi bulunamadı.', 'red');
                     return;
                 }
 
-                company.memory.parsedFmeaSheets.push({
-                    id: 'pfmea-' + Math.random().toString(36).substr(2, 9),
-                    fileName: file.name,
-                    uploadDate: new Date().toISOString().split('T')[0],
-                    sheetName: sheetName,
-                    processName: linkedProcess,
-                    rowCount: rows.length,
-                    uploadedBy: this.activeUserId || '',
-                    rows: rows
-                });
                 this.saveCompanies();
 
                 // Temizle
@@ -8423,8 +8636,64 @@ LÜTFEN SADECE AŞAĞIDAKİ JSON FORMATINDA YANIT VER:
                 const selector = document.getElementById('pfmea-sheet-selector');
                 if (selector) { selector.innerHTML = ''; selector.classList.add('hidden'); }
 
-                this._showInfoToast(`${rows.length} adet FMEA satırı başarıyla kaydedildi!`, 'green');
+                this._showInfoToast(`${savedSheets} sheet, toplam ${totalRows} FMEA satırı kaydedildi!`, 'green');
                 this.renderPfmeaSheetsCard();
+            },
+
+            // Tek bir sheet'i bağımsız parse et (cross-contamination önlenir)
+            _parseSheet(wb, sheetName) {
+                const ws = wb.Sheets[sheetName];
+                if (!ws) return [];
+
+                // Merged cell'leri doldur (kopyasında çalış, orijinali bozma)
+                const wsCopy = JSON.parse(JSON.stringify(ws));
+                if (wsCopy['!merges']) {
+                    wsCopy['!merges'].forEach(merge => {
+                        const topLeft = wsCopy[XLSX.utils.encode_cell({r: merge.s.r, c: merge.s.c})];
+                        if (!topLeft) return;
+                        for (let r = merge.s.r; r <= merge.e.r; r++) {
+                            for (let c = merge.s.c; c <= merge.e.c; c++) {
+                                const addr = XLSX.utils.encode_cell({r, c});
+                                if (!wsCopy[addr]) wsCopy[addr] = {t: topLeft.t, v: topLeft.v};
+                            }
+                        }
+                    });
+                }
+
+                const rawData = XLSX.utils.sheet_to_json(wsCopy, { header: 1, defval: '' });
+                if (rawData.length < 2) return [];
+
+                // Header satırını bul
+                let bestHeaderIdx = 0, bestColMap = {}, bestMatchCount = 0;
+                const scanLimit = Math.min(15, rawData.length);
+                for (let i = 0; i < scanLimit; i++) {
+                    const candidate = rawData[i].map(h => String(h).toLocaleLowerCase('tr').trim());
+                    const candidateMap = this._detectPfmeaColumns(candidate);
+                    const matchCount = Object.keys(candidateMap).length;
+                    if (matchCount > bestMatchCount) {
+                        bestMatchCount = matchCount;
+                        bestHeaderIdx = i;
+                        bestColMap = candidateMap;
+                    }
+                }
+                if (bestMatchCount < 2) return []; // En az 2 sütun eşleşmeli
+
+                const colMap = bestColMap;
+
+                // processStep fill-down (merged cell fix)
+                const psIdx = colMap.processStep;
+                if (psIdx !== undefined) {
+                    let lastVal = '';
+                    for (let i = bestHeaderIdx + 1; i < rawData.length; i++) {
+                        const cellVal = String(rawData[i][psIdx] || '').trim();
+                        if (cellVal) lastVal = cellVal;
+                        else if (lastVal) rawData[i][psIdx] = lastVal;
+                    }
+                }
+
+                return rawData.slice(bestHeaderIdx + 1)
+                    .map(row => this._mapPfmeaRow(row, colMap))
+                    .filter(r => r.failureMode || r.processStep);
             },
 
             removeParsedFmea(sheetId) {
@@ -8584,6 +8853,581 @@ LÜTFEN SADECE AŞAĞIDAKİ JSON FORMATINDA YANIT VER:
                 if (countEl) countEl.textContent = `${filtered.length} satır gösteriliyor`;
             },
 
+            // ==================== LL EXCEL UPLOAD ====================
+            handleLLExcelUpload(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+                this._pendingLLFile = file;
+                document.getElementById('ll-file-name').textContent = file.name;
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const wb = XLSX.read(e.target.result, { type: 'array' });
+                        this._pendingLLWorkbook = wb;
+                        this._renderLLSheetSelector(wb);
+                    } catch (err) {
+                        this._showInfoToast('Excel dosyası okunamadı: ' + err.message, 'red');
+                    }
+                };
+                reader.readAsArrayBuffer(file);
+            },
+
+            _renderLLSheetSelector(workbook) {
+                const container = document.getElementById('ll-sheet-selector');
+                if (!container) return;
+                const sheets = workbook.SheetNames;
+                const sheetInfos = sheets.map(name => {
+                    const rows = this._parseLLSheet(workbook, name);
+                    return { name, rowCount: rows.length };
+                });
+                const totalRows = sheetInfos.reduce((sum, s) => sum + s.rowCount, 0);
+                const validSheets = sheetInfos.filter(s => s.rowCount > 0).length;
+
+                container.innerHTML = `
+                    <div class="bg-teal-50 border border-teal-200 rounded-xl p-3 mb-3">
+                        <div class="flex items-center gap-2 mb-2">
+                            <i class="fa-solid fa-file-excel text-teal-600"></i>
+                            <span class="text-xs font-bold text-teal-700">${sheets.length} sheet · ${validSheets} geçerli · Toplam ${totalRows} satır</span>
+                        </div>
+                        <div class="flex flex-wrap gap-2 mb-3">
+                            ${sheetInfos.map((s, i) => `
+                                <button onclick="app._selectLLSheet('${s.name.replace(/'/g, "\\\\'")}')" id="ll-sheet-btn-${i}"
+                                    class="px-3 py-1.5 text-xs font-bold border rounded-lg transition ${s.rowCount > 0 ? 'bg-white border-teal-300 text-teal-700 hover:bg-teal-50' : 'bg-slate-50 border-slate-200 text-slate-400'}">
+                                    ${s.name} <span class="text-[10px] font-normal">(${s.rowCount})</span>
+                                </button>
+                            `).join('')}
+                        </div>
+                        <div id="ll-preview-table"></div>
+                    </div>
+                `;
+                container.classList.remove('hidden');
+                if (sheets.length > 0) this._selectLLSheet(sheets[0]);
+            },
+
+            _selectLLSheet(sheetName) {
+                const wb = this._pendingLLWorkbook;
+                if (!wb) return;
+                const rows = this._parseLLSheet(wb, sheetName);
+                const preview = document.getElementById('ll-preview-table');
+                if (!preview) return;
+                if (!rows || rows.length === 0) {
+                    preview.innerHTML = '<p class="text-xs text-red-500 italic">Bu sheet\'te geçerli LL verisi bulunamadı.</p>';
+                    return;
+                }
+                const previewRows = rows.slice(0, 5);
+                preview.innerHTML = `
+                    <div class="bg-white border border-teal-100 rounded-lg p-2">
+                        <span class="text-xs font-bold text-teal-700">${rows.length} satır</span>
+                        <table class="w-full text-[11px] mt-1">
+                            <thead><tr class="bg-teal-50">
+                                <th class="text-left p-1.5 font-black text-teal-800">Konu</th>
+                                <th class="text-left p-1.5 font-black text-teal-800">Ders / Çıkarım</th>
+                                <th class="text-left p-1.5 font-black text-teal-800">Kök Neden</th>
+                            </tr></thead>
+                            <tbody>
+                                ${previewRows.map(r => `
+                                    <tr class="border-b border-teal-50">
+                                        <td class="p-1.5 text-slate-700">${r.topic || '-'}</td>
+                                        <td class="p-1.5 text-slate-600">${r.lesson || '-'}</td>
+                                        <td class="p-1.5 text-slate-500">${r.rootCause || '-'}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                        ${rows.length > 5 ? `<p class="text-[10px] text-slate-400 mt-1 italic">... ve ${rows.length - 5} satır daha</p>` : ''}
+                    </div>
+                `;
+            },
+
+            _parseLLSheet(wb, sheetName) {
+                const ws = wb.Sheets[sheetName];
+                if (!ws) return [];
+                const wsCopy = JSON.parse(JSON.stringify(ws));
+                if (wsCopy['!merges']) {
+                    wsCopy['!merges'].forEach(merge => {
+                        const topLeft = wsCopy[XLSX.utils.encode_cell({r: merge.s.r, c: merge.s.c})];
+                        if (!topLeft) return;
+                        for (let r = merge.s.r; r <= merge.e.r; r++) {
+                            for (let c = merge.s.c; c <= merge.e.c; c++) {
+                                const addr = XLSX.utils.encode_cell({r, c});
+                                if (!wsCopy[addr]) wsCopy[addr] = {t: topLeft.t, v: topLeft.v};
+                            }
+                        }
+                    });
+                }
+                const rawData = XLSX.utils.sheet_to_json(wsCopy, { header: 1, defval: '' });
+                if (rawData.length < 2) return [];
+
+                let bestHeaderIdx = 0, bestColMap = {}, bestMatchCount = 0;
+                const scanLimit = Math.min(15, rawData.length);
+                for (let i = 0; i < scanLimit; i++) {
+                    const candidate = rawData[i].map(h => String(h).toLocaleLowerCase('tr').trim());
+                    const candidateMap = this._detectLLColumns(candidate);
+                    const matchCount = Object.keys(candidateMap).length;
+                    if (matchCount > bestMatchCount) {
+                        bestMatchCount = matchCount;
+                        bestHeaderIdx = i;
+                        bestColMap = candidateMap;
+                    }
+                }
+                if (bestMatchCount < 2) return [];
+                const colMap = bestColMap;
+
+                return rawData.slice(bestHeaderIdx + 1)
+                    .map(row => this._mapLLRow(row, colMap))
+                    .filter(r => r.topic || r.lesson);
+            },
+
+            _detectLLColumns(headerRow) {
+                const matchers = {
+                    date:        ['tarih', 'date', 'zaman', 'gün', 'gun'],
+                    topic:       ['konu', 'problem', 'sorun', 'hata', 'topic', 'başlık', 'baslik', 'açıklama', 'aciklama', 'tanım', 'tanim', 'olay'],
+                    process:     ['proses', 'process', 'istasyon', 'hat', 'alan', 'bölüm', 'bolum', 'departman'],
+                    rootCause:   ['kök neden', 'kok neden', 'root cause', 'neden', 'sebep', 'cause'],
+                    lesson:      ['ders', 'lesson', 'öğrenilen', 'ogrenilen', 'çıkarım', 'cikarim', 'sonuç', 'sonuc', 'bulgu', 'learned'],
+                    action:      ['önlem', 'onlem', 'aksiyon', 'action', 'düzeltici', 'duzeltici', 'iyileştirme', 'iyilestirme', 'tedbir', 'faaliyet'],
+                    responsible: ['sorumlu', 'responsible', 'sahip', 'kişi', 'kisi', 'owner', 'kim']
+                };
+                const colMap = {};
+                headerRow.forEach((h, idx) => {
+                    for (const [fieldName, keywords] of Object.entries(matchers)) {
+                        if (!colMap[fieldName] && keywords.some(kw => h.includes(kw))) {
+                            colMap[fieldName] = idx;
+                        }
+                    }
+                });
+                return colMap;
+            },
+
+            _mapLLRow(row, colMap) {
+                const get = (field) => {
+                    const idx = colMap[field];
+                    if (idx === undefined) return '';
+                    const val = row[idx];
+                    return val == null ? '' : String(val).trim().substring(0, 300);
+                };
+                return { date: get('date'), topic: get('topic'), process: get('process'), rootCause: get('rootCause'), lesson: get('lesson'), action: get('action'), responsible: get('responsible') };
+            },
+
+            saveParsedLL() {
+                const file = this._pendingLLFile;
+                const wb = this._pendingLLWorkbook;
+                if (!file || !wb) { this._showInfoToast('Lütfen önce bir Excel dosyası seçin.', 'red'); return; }
+
+                const company = this.companies.find(c => c.id === this.activeCompanyId);
+                if (!company) return;
+                if (!company.memory.parsedLLSheets) company.memory.parsedLLSheets = [];
+
+                let totalRows = 0, savedSheets = 0;
+                for (const sheetName of wb.SheetNames) {
+                    const sheetRows = this._parseLLSheet(wb, sheetName);
+                    if (!sheetRows || sheetRows.length === 0) continue;
+
+                    const testCompany = JSON.parse(JSON.stringify(company));
+                    testCompany.memory.parsedLLSheets.push({ rows: sheetRows });
+                    if (JSON.stringify(testCompany).length > 800000) {
+                        this._showInfoToast('Depolama sınırına yaklaşıldı! ' + savedSheets + ' sheet kaydedildi.', 'red');
+                        break;
+                    }
+
+                    company.memory.parsedLLSheets.push({
+                        id: 'll-' + Math.random().toString(36).substr(2, 9),
+                        fileName: file.name,
+                        uploadDate: new Date().toISOString().split('T')[0],
+                        sheetName, rowCount: sheetRows.length,
+                        uploadedBy: this.activeUserId || '',
+                        rows: sheetRows
+                    });
+                    totalRows += sheetRows.length;
+                    savedSheets++;
+                }
+                if (savedSheets === 0) { this._showInfoToast('Hiçbir sheet\'te geçerli LL verisi bulunamadı.', 'red'); return; }
+
+                this.saveCompanies();
+                this._pendingLLFile = null; this._pendingLLWorkbook = null;
+                const fileInput = document.getElementById('ll-file-input');
+                if (fileInput) fileInput.value = '';
+                document.getElementById('ll-file-name').textContent = 'Dosya seçilmedi';
+                const selector = document.getElementById('ll-sheet-selector');
+                if (selector) { selector.innerHTML = ''; selector.classList.add('hidden'); }
+
+                this._showInfoToast(`${savedSheets} sheet, toplam ${totalRows} LL satırı kaydedildi!`, 'green');
+                this.renderLLSheetsCard();
+            },
+
+            renderLLSheetsCard() {
+                const container = document.getElementById('memory-list-ll-sheets');
+                if (!container) return;
+                const company = this.companies.find(c => c.id === this.activeCompanyId);
+                const sheets = company?.memory?.parsedLLSheets || [];
+
+                if (sheets.length === 0) {
+                    container.innerHTML = '<p class="text-xs text-slate-400 italic text-center py-4">Henüz LL Excel yüklenmedi.</p>';
+                    return;
+                }
+
+                container.innerHTML = sheets.map(sheet => `
+                    <div class="bg-white border border-slate-200 rounded-xl p-3 group relative hover:shadow-sm transition">
+                        <button onclick="app.removeParsedLL('${sheet.id}')"
+                            class="absolute top-2 right-2 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition">
+                            <i class="fa-solid fa-trash-can text-sm"></i>
+                        </button>
+                        <div class="flex items-start gap-3">
+                            <i class="fa-solid fa-file-excel text-teal-600 text-xl mt-0.5 shrink-0"></i>
+                            <div class="min-w-0 flex-1">
+                                <div class="text-sm font-bold text-slate-800 truncate">${sheet.fileName}</div>
+                                <div class="text-[10px] text-slate-400 mb-2">${sheet.uploadDate} · Sheet: ${sheet.sheetName} · ${sheet.rowCount} satır</div>
+                                <button onclick="app.showLLTable('${sheet.id}')"
+                                    class="text-[11px] font-bold text-teal-700 hover:text-teal-900 flex items-center gap-1 transition">
+                                    <i class="fa-solid fa-table text-[10px]"></i> Tabloyu Görüntüle
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            },
+
+            removeParsedLL(sheetId) {
+                if (!confirm('Bu LL verisini silmek istediğinize emin misiniz?')) return;
+                const company = this.companies.find(c => c.id === this.activeCompanyId);
+                if (company?.memory?.parsedLLSheets) {
+                    company.memory.parsedLLSheets = company.memory.parsedLLSheets.filter(s => s.id !== sheetId);
+                    this.saveCompanies();
+                    this.renderLLSheetsCard();
+                }
+            },
+
+            showLLTable(sheetId) {
+                const company = this.companies.find(c => c.id === this.activeCompanyId);
+                const sheet = company?.memory?.parsedLLSheets?.find(s => s.id === sheetId);
+                if (!sheet) return;
+
+                const modal = document.createElement('div');
+                modal.id = '_ll-table-modal';
+                modal.innerHTML = `
+                    <div class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9998] flex items-center justify-center p-4">
+                        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-5xl flex flex-col animate-fade-in" style="max-height:90vh;">
+                            <div class="bg-teal-600 px-6 py-4 flex items-center justify-between rounded-t-3xl shrink-0">
+                                <div>
+                                    <p class="font-black text-white">${sheet.fileName} — ${sheet.sheetName}</p>
+                                    <p class="text-teal-100 text-xs">${sheet.rowCount} satır · ${sheet.uploadDate}</p>
+                                </div>
+                                <button onclick="document.getElementById('_ll-table-modal').remove()"
+                                    class="text-teal-200 hover:text-white transition text-xl"><i class="fa-solid fa-xmark"></i></button>
+                            </div>
+                            <div class="overflow-auto flex-1 p-4">
+                                <table class="w-full text-xs border-collapse">
+                                    <thead class="sticky top-0 bg-slate-100 z-10">
+                                        <tr>
+                                            <th class="text-left p-2 font-black text-slate-700">Konu</th>
+                                            <th class="text-left p-2 font-black text-slate-700">Ders / Çıkarım</th>
+                                            <th class="text-left p-2 font-black text-slate-700">Kök Neden</th>
+                                            <th class="text-left p-2 font-black text-slate-700">Önlem</th>
+                                            <th class="text-left p-2 font-black text-slate-700">Sorumlu</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${sheet.rows.map(r => `
+                                            <tr class="border-b border-slate-100 hover:bg-slate-50">
+                                                <td class="p-2 font-medium text-slate-800">${r.topic || '-'}</td>
+                                                <td class="p-2 text-slate-600">${r.lesson || '-'}</td>
+                                                <td class="p-2 text-slate-500">${r.rootCause || '-'}</td>
+                                                <td class="p-2 text-slate-500">${r.action || '-'}</td>
+                                                <td class="p-2 text-slate-400">${r.responsible || '-'}</td>
+                                            </tr>
+                                        `).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="px-6 py-4 border-t border-slate-100 shrink-0 flex justify-end">
+                                <button onclick="document.getElementById('_ll-table-modal').remove()"
+                                    class="bg-slate-900 text-white font-bold px-6 py-2.5 rounded-xl text-sm hover:bg-slate-700 transition">Kapat</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(modal);
+            },
+
+            // ==================== 8D RECORDS ====================
+            handlePast8DUpload(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+                this._pending8DFile = file;
+                document.getElementById('past8d-file-name').textContent = file.name;
+
+                const isPdf = file.name.toLowerCase().endsWith('.pdf');
+                const pdfPanel = document.getElementById('past8d-pdf-summary');
+                const sheetSelector = document.getElementById('past8d-sheet-selector');
+
+                if (isPdf) {
+                    // PDF — sadece özet al
+                    if (pdfPanel) pdfPanel.classList.remove('hidden');
+                    if (sheetSelector) { sheetSelector.innerHTML = ''; sheetSelector.classList.add('hidden'); }
+                    this._pending8DWorkbook = null;
+                    this._pending8DIsPdf = true;
+                } else {
+                    // Excel
+                    if (pdfPanel) pdfPanel.classList.add('hidden');
+                    this._pending8DIsPdf = false;
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        try {
+                            const wb = XLSX.read(e.target.result, { type: 'array' });
+                            this._pending8DWorkbook = wb;
+                            this._render8DSheetSelector(wb);
+                        } catch (err) {
+                            this._showInfoToast('Excel dosyası okunamadı: ' + err.message, 'red');
+                        }
+                    };
+                    reader.readAsArrayBuffer(file);
+                }
+            },
+
+            _render8DSheetSelector(workbook) {
+                const container = document.getElementById('past8d-sheet-selector');
+                if (!container) return;
+                const sheets = workbook.SheetNames;
+                const sheetInfos = sheets.map(name => {
+                    const rows = this._parse8DSheet(workbook, name);
+                    return { name, rowCount: rows.length };
+                });
+                const totalRows = sheetInfos.reduce((sum, s) => sum + s.rowCount, 0);
+
+                container.innerHTML = `
+                    <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-3 mb-3">
+                        <div class="flex items-center gap-2 mb-2">
+                            <i class="fa-solid fa-file-excel text-emerald-600"></i>
+                            <span class="text-xs font-bold text-emerald-700">${sheets.length} sheet · Toplam ${totalRows} satır</span>
+                        </div>
+                        <div class="flex flex-wrap gap-2">
+                            ${sheetInfos.map(s => `
+                                <span class="px-3 py-1.5 text-xs font-bold border rounded-lg ${s.rowCount > 0 ? 'bg-white border-emerald-300 text-emerald-700' : 'bg-slate-50 border-slate-200 text-slate-400'}">
+                                    ${s.name} (${s.rowCount})
+                                </span>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+                container.classList.remove('hidden');
+            },
+
+            _parse8DSheet(wb, sheetName) {
+                const ws = wb.Sheets[sheetName];
+                if (!ws) return [];
+                const wsCopy = JSON.parse(JSON.stringify(ws));
+                if (wsCopy['!merges']) {
+                    wsCopy['!merges'].forEach(merge => {
+                        const topLeft = wsCopy[XLSX.utils.encode_cell({r: merge.s.r, c: merge.s.c})];
+                        if (!topLeft) return;
+                        for (let r = merge.s.r; r <= merge.e.r; r++) {
+                            for (let c = merge.s.c; c <= merge.e.c; c++) {
+                                const addr = XLSX.utils.encode_cell({r, c});
+                                if (!wsCopy[addr]) wsCopy[addr] = {t: topLeft.t, v: topLeft.v};
+                            }
+                        }
+                    });
+                }
+                const rawData = XLSX.utils.sheet_to_json(wsCopy, { header: 1, defval: '' });
+                if (rawData.length < 2) return [];
+
+                let bestHeaderIdx = 0, bestColMap = {}, bestMatchCount = 0;
+                const scanLimit = Math.min(15, rawData.length);
+                for (let i = 0; i < scanLimit; i++) {
+                    const candidate = rawData[i].map(h => String(h).toLocaleLowerCase('tr').trim());
+                    const candidateMap = this._detect8DColumns(candidate);
+                    const matchCount = Object.keys(candidateMap).length;
+                    if (matchCount > bestMatchCount) {
+                        bestMatchCount = matchCount;
+                        bestHeaderIdx = i;
+                        bestColMap = candidateMap;
+                    }
+                }
+                if (bestMatchCount < 2) return [];
+
+                return rawData.slice(bestHeaderIdx + 1)
+                    .map(row => {
+                        const get = (f) => { const i = bestColMap[f]; return i === undefined ? '' : String(row[i] || '').trim().substring(0, 300); };
+                        return { reportNo: get('reportNo'), date: get('date'), problem: get('problem'), rootCause: get('rootCause'), actions: get('actions'), status: get('status'), responsible: get('responsible') };
+                    })
+                    .filter(r => r.problem || r.reportNo);
+            },
+
+            _detect8DColumns(headerRow) {
+                const matchers = {
+                    reportNo:    ['rapor no', 'report no', '8d no', 'numara', 'referans', 'rapor'],
+                    date:        ['tarih', 'date', 'açılış', 'acilis', 'kapanış', 'kapanis'],
+                    problem:     ['problem', 'sorun', 'hata', 'uygunsuzluk', 'tanım', 'tanim', 'açıklama', 'aciklama', 'konu'],
+                    rootCause:   ['kök neden', 'kok neden', 'root cause', 'neden', 'sebep'],
+                    actions:     ['aksiyon', 'action', 'önlem', 'onlem', 'düzeltici', 'duzeltici', 'faaliyet', 'iyileştirme'],
+                    status:      ['durum', 'status', 'sonuç', 'sonuc'],
+                    responsible: ['sorumlu', 'lider', 'responsible', 'owner', 'kişi', 'kisi']
+                };
+                const colMap = {};
+                headerRow.forEach((h, idx) => {
+                    for (const [fieldName, keywords] of Object.entries(matchers)) {
+                        if (!colMap[fieldName] && keywords.some(kw => h.includes(kw))) {
+                            colMap[fieldName] = idx;
+                        }
+                    }
+                });
+                return colMap;
+            },
+
+            saveParsed8D() {
+                const file = this._pending8DFile;
+                if (!file) { this._showInfoToast('Lütfen önce bir dosya seçin.', 'red'); return; }
+
+                const company = this.companies.find(c => c.id === this.activeCompanyId);
+                if (!company) return;
+                if (!company.memory.past8DRecords) company.memory.past8DRecords = [];
+
+                if (this._pending8DIsPdf) {
+                    const summary = document.getElementById('past8d-summary-input')?.value?.trim() || '';
+                    company.memory.past8DRecords.push({
+                        id: '8d-' + Math.random().toString(36).substr(2, 9),
+                        type: 'pdf', fileName: file.name,
+                        uploadDate: new Date().toISOString().split('T')[0],
+                        summary
+                    });
+                    this.saveCompanies();
+                    this._showInfoToast('PDF kaydedildi!', 'green');
+                } else {
+                    const wb = this._pending8DWorkbook;
+                    if (!wb) { this._showInfoToast('Excel dosyası okunamadı.', 'red'); return; }
+                    let totalRows = 0, savedSheets = 0;
+                    for (const sheetName of wb.SheetNames) {
+                        const sheetRows = this._parse8DSheet(wb, sheetName);
+                        if (!sheetRows || sheetRows.length === 0) continue;
+
+                        const testCompany = JSON.parse(JSON.stringify(company));
+                        testCompany.memory.past8DRecords.push({ rows: sheetRows });
+                        if (JSON.stringify(testCompany).length > 800000) {
+                            this._showInfoToast('Depolama sınırına yaklaşıldı!', 'red');
+                            break;
+                        }
+
+                        company.memory.past8DRecords.push({
+                            id: '8d-' + Math.random().toString(36).substr(2, 9),
+                            type: 'excel', fileName: file.name,
+                            uploadDate: new Date().toISOString().split('T')[0],
+                            sheetName, rowCount: sheetRows.length, rows: sheetRows
+                        });
+                        totalRows += sheetRows.length;
+                        savedSheets++;
+                    }
+                    if (savedSheets === 0) { this._showInfoToast('Geçerli 8D verisi bulunamadı.', 'red'); return; }
+                    this.saveCompanies();
+                    this._showInfoToast(`${savedSheets} sheet, toplam ${totalRows} 8D satırı kaydedildi!`, 'green');
+                }
+
+                // Temizle
+                this._pending8DFile = null; this._pending8DWorkbook = null; this._pending8DIsPdf = false;
+                const fi = document.getElementById('past8d-file-input'); if (fi) fi.value = '';
+                document.getElementById('past8d-file-name').textContent = 'Dosya seçilmedi';
+                const sel = document.getElementById('past8d-sheet-selector'); if (sel) { sel.innerHTML = ''; sel.classList.add('hidden'); }
+                const pdf = document.getElementById('past8d-pdf-summary'); if (pdf) pdf.classList.add('hidden');
+                this.renderPast8DList();
+            },
+
+            addManualPast8D() {
+                const reportNo = document.getElementById('new-8d-reportno')?.value?.trim() || '';
+                const date = document.getElementById('new-8d-date')?.value || '';
+                const problem = document.getElementById('new-8d-problem')?.value?.trim() || '';
+                const rootCause = document.getElementById('new-8d-rootcause')?.value?.trim() || '';
+                const actions = document.getElementById('new-8d-actions')?.value?.trim() || '';
+                const status = document.getElementById('new-8d-status')?.value || 'Kapalı';
+
+                if (!problem) { alert('Problem tanımı zorunludur.'); return; }
+
+                const company = this.companies.find(c => c.id === this.activeCompanyId);
+                if (!company) return;
+                if (!company.memory.past8DRecords) company.memory.past8DRecords = [];
+
+                company.memory.past8DRecords.push({
+                    id: '8d-' + Math.random().toString(36).substr(2, 9),
+                    type: 'manual', reportNo, date: date || new Date().toISOString().split('T')[0],
+                    problem, rootCause, actions, status,
+                    createdAt: new Date().toISOString().split('T')[0]
+                });
+                this.saveCompanies();
+                this._showInfoToast('8D kaydı eklendi!', 'green');
+
+                // Temizle
+                ['new-8d-reportno', 'new-8d-problem', 'new-8d-rootcause', 'new-8d-actions'].forEach(id => {
+                    const el = document.getElementById(id); if (el) el.value = '';
+                });
+                this.renderPast8DList();
+            },
+
+            renderPast8DList() {
+                const container = document.getElementById('memory-list-past8d');
+                const manualContainer = document.getElementById('memory-list-past8d-manual');
+                const company = this.companies.find(c => c.id === this.activeCompanyId);
+                const records = company?.memory?.past8DRecords || [];
+
+                // Uploaded records (excel/pdf)
+                const uploaded = records.filter(r => r.type === 'excel' || r.type === 'pdf');
+                if (container) {
+                    if (uploaded.length === 0) {
+                        container.innerHTML = '<p class="text-xs text-slate-400 italic text-center py-4">Henüz 8D dosyası yüklenmedi.</p>';
+                    } else {
+                        container.innerHTML = uploaded.map(rec => `
+                            <div class="bg-white border border-slate-200 rounded-xl p-3 group relative hover:shadow-sm transition">
+                                <button onclick="app.removePast8D('${rec.id}')"
+                                    class="absolute top-2 right-2 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition">
+                                    <i class="fa-solid fa-trash-can text-sm"></i>
+                                </button>
+                                <div class="flex items-start gap-3">
+                                    <i class="fa-solid ${rec.type === 'pdf' ? 'fa-file-pdf text-red-500' : 'fa-file-excel text-emerald-600'} text-xl mt-0.5 shrink-0"></i>
+                                    <div class="min-w-0 flex-1">
+                                        <div class="text-sm font-bold text-slate-800 truncate">${rec.fileName}</div>
+                                        <div class="text-[10px] text-slate-400">${rec.uploadDate} ${rec.sheetName ? '· Sheet: ' + rec.sheetName : ''} ${rec.rowCount ? '· ' + rec.rowCount + ' satır' : ''}</div>
+                                        ${rec.summary ? `<div class="text-xs text-slate-500 mt-1 line-clamp-2">${rec.summary}</div>` : ''}
+                                    </div>
+                                </div>
+                            </div>
+                        `).join('');
+                    }
+                }
+
+                // Manuel records
+                const manual = records.filter(r => r.type === 'manual');
+                if (manualContainer) {
+                    if (manual.length === 0) {
+                        manualContainer.innerHTML = '<p class="text-xs text-slate-400 italic text-center py-4">Manuel 8D kaydı bulunamadı.</p>';
+                    } else {
+                        manualContainer.innerHTML = manual.map(rec => `
+                            <div class="bg-white border border-slate-200 p-3 rounded-xl hover:shadow-md transition group relative">
+                                <button onclick="app.removePast8D('${rec.id}')"
+                                    class="absolute top-2 right-2 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition">
+                                    <i class="fa-solid fa-trash-can text-sm"></i>
+                                </button>
+                                <div class="flex items-center gap-2 mb-1">
+                                    ${rec.reportNo ? `<span class="text-[10px] font-black text-emerald-600 uppercase">${rec.reportNo}</span>` : ''}
+                                    <span class="text-[10px] text-slate-400">${rec.date}</span>
+                                    <span class="text-[10px] font-bold px-1.5 py-0.5 rounded ${rec.status === 'Kapalı' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}">${rec.status}</span>
+                                </div>
+                                <div class="text-sm font-bold text-slate-800 mb-1">${rec.problem}</div>
+                                ${rec.rootCause ? `<div class="text-xs text-slate-500"><span class="font-bold">Kök Neden:</span> ${rec.rootCause}</div>` : ''}
+                                ${rec.actions ? `<div class="text-xs text-slate-500 mt-1"><span class="font-bold">Aksiyonlar:</span> ${rec.actions}</div>` : ''}
+                            </div>
+                        `).join('');
+                    }
+                }
+            },
+
+            removePast8D(id) {
+                if (!confirm('Bu kaydı silmek istediğinize emin misiniz?')) return;
+                const company = this.companies.find(c => c.id === this.activeCompanyId);
+                if (company?.memory?.past8DRecords) {
+                    company.memory.past8DRecords = company.memory.past8DRecords.filter(r => r.id !== id);
+                    this.saveCompanies();
+                    this.renderPast8DList();
+                }
+            },
+
             toggleAddUserForm() {
                 const form = document.getElementById('ch-add-user-form');
                 const btn = document.getElementById('ch-btn-toggle-user-form');
@@ -8667,6 +9511,7 @@ LÜTFEN SADECE AŞAĞIDAKİ JSON FORMATINDA YANIT VER:
                 if (company.users.length === 0) {
                     container.innerHTML = '<p class="text-xs text-slate-400 italic text-center py-4">Kullanıcı bulunamadı.</p>';
                 } else {
+                    const isAdmin = this.activeUserRole === 'Yönetici';
                     container.innerHTML = `
                         <div class="space-y-3">
                             ${company.users.map(u => `
@@ -8684,6 +9529,10 @@ LÜTFEN SADECE AŞAĞIDAKİ JSON FORMATINDA YANIT VER:
                                         <span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${u.role === 'Yönetici' ? 'bg-purple-50 text-purple-600' : u.role === 'Lider' ? 'bg-blue-50 text-blue-600' : 'bg-slate-50 text-slate-600'}">
                                             ${u.role}
                                         </span>
+                                        ${isAdmin ? `
+                                        <button onclick="app.openEditUser('${u.id}')" class="text-slate-300 hover:text-blue-500 transition-colors">
+                                            <i class="fa-solid fa-pen-to-square text-xs"></i>
+                                        </button>` : ''}
                                         <button onclick="app.removeUserFromCompany('${u.id}')" class="text-slate-300 hover:text-red-500 transition-colors">
                                             <i class="fa-solid fa-trash-can text-xs"></i>
                                         </button>
@@ -8693,6 +9542,114 @@ LÜTFEN SADECE AŞAĞIDAKİ JSON FORMATINDA YANIT VER:
                         </div>
                     `;
                 }
+            },
+
+            openEditUser(userId) {
+                const company = this.companies.find(c => c.id === this.activeCompanyId);
+                if (!company) return;
+                const user = company.users.find(u => u.id === userId);
+                if (!user) return;
+
+                const depts = company.departments || [];
+                const modal = document.createElement('div');
+                modal.id = '_edit-user-modal';
+                modal.innerHTML = `
+                    <div class="fixed inset-0 bg-black/30 backdrop-blur-sm z-[9998] flex items-center justify-center p-4">
+                        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-fade-in">
+                            <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                                <h3 class="font-black text-slate-800">Kullanıcı Düzenle</h3>
+                                <button onclick="document.getElementById('_edit-user-modal').remove()"
+                                    class="text-slate-400 hover:text-slate-600 transition"><i class="fa-solid fa-xmark"></i></button>
+                            </div>
+                            <div class="px-6 py-5 space-y-3">
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Ad Soyad</label>
+                                    <input type="text" id="_edit-user-name" value="${user.name}" style="width:100%;box-sizing:border-box;"
+                                        class="px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500/30">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Kullanıcı Adı</label>
+                                    <input type="text" id="_edit-user-username" value="${user.username}" style="width:100%;box-sizing:border-box;"
+                                        class="px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500/30">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Şifre</label>
+                                    <input type="text" id="_edit-user-password" value="${user.password}" style="width:100%;box-sizing:border-box;"
+                                        class="px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500/30">
+                                </div>
+                                <div class="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Rol</label>
+                                        <select id="_edit-user-role" style="width:100%;box-sizing:border-box;"
+                                            class="px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500/30">
+                                            <option value="Yönetici" ${user.role === 'Yönetici' ? 'selected' : ''}>Yönetici</option>
+                                            <option value="Lider" ${user.role === 'Lider' ? 'selected' : ''}>Lider</option>
+                                            <option value="Üye" ${user.role === 'Üye' ? 'selected' : ''}>Üye</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Departman</label>
+                                        <select id="_edit-user-dept" style="width:100%;box-sizing:border-box;"
+                                            class="px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500/30">
+                                            ${depts.map(d => `<option value="${d}" ${user.department === d ? 'selected' : ''}>${d}</option>`).join('')}
+                                            ${!depts.includes(user.department) && user.department ? `<option value="${user.department}" selected>${user.department}</option>` : ''}
+                                        </select>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Görev / Unvan</label>
+                                    <input type="text" id="_edit-user-duty" value="${user.duty || ''}" style="width:100%;box-sizing:border-box;"
+                                        class="px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500/30">
+                                </div>
+                            </div>
+                            <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
+                                <button onclick="document.getElementById('_edit-user-modal').remove()"
+                                    class="px-4 py-2 text-sm font-bold text-slate-500 hover:text-slate-700 transition">İptal</button>
+                                <button onclick="app.saveEditUser('${userId}')"
+                                    class="px-5 py-2 bg-blue-600 text-white font-bold rounded-lg text-sm hover:bg-blue-700 transition">Kaydet</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(modal);
+            },
+
+            saveEditUser(userId) {
+                const company = this.companies.find(c => c.id === this.activeCompanyId);
+                if (!company) return;
+                const user = company.users.find(u => u.id === userId);
+                if (!user) return;
+
+                const name = document.getElementById('_edit-user-name')?.value?.trim();
+                const username = document.getElementById('_edit-user-username')?.value?.trim();
+                const password = document.getElementById('_edit-user-password')?.value?.trim();
+                const role = document.getElementById('_edit-user-role')?.value;
+                const department = document.getElementById('_edit-user-dept')?.value;
+                const duty = document.getElementById('_edit-user-duty')?.value?.trim();
+
+                if (!name || !username || !password) {
+                    alert('Ad, kullanıcı adı ve şifre zorunludur.');
+                    return;
+                }
+
+                // Kullanıcı adı benzersizlik kontrolü (kendi hariç)
+                const duplicate = company.users.find(u => u.id !== userId && u.username === username);
+                if (duplicate) {
+                    alert('Bu kullanıcı adı zaten kullanılıyor.');
+                    return;
+                }
+
+                user.name = name;
+                user.username = username;
+                user.password = password;
+                user.role = role;
+                user.department = department;
+                user.duty = duty;
+
+                this.saveCompanies();
+                document.getElementById('_edit-user-modal')?.remove();
+                this.renderUserList();
+                this._showInfoToast('Kullanıcı güncellendi!', 'green');
             },
 
             // ============ BETA INFRASTRUCTURE ============
