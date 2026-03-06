@@ -1,2 +1,5 @@
-app.js
-project_handoff.json
+# Environment & secrets
+.env
+
+# OS files
+.DS_Store
