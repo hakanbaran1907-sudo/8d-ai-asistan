@@ -672,13 +672,15 @@
                     currentStep: 0,
                     team: [],
                     images: [], // [{ category, data, name }]
-                    problem: { what: '', where: '', when: '', who: '', why: '', how: '', whenDate: '', whenTime: '', whenShift: '' },
+                    okPartImage: '', // base64, uygun parça fotoğrafı
+                    problem: { what: '', where: '', when: '', who: '', whoMade: '', whoCaught: '', why: '', how: '', whenDate: '', whenTime: '', whenShift: '' },
                     header: { partNo: '', partName: '', lotNo: '', quantity: '', customer: '', invoiceNo: '', process: '', openedBy: '', openDate: now.toISOString().split('T')[0], problemDesc: '' },
                     details: {
                         types: { Dimensional: false, Environmental: false, Process: false, Visual: false, Safety: false, Functional: false, Other: '' },
                         detection: { InputControl: false, BMCProcess: false, SMCProcess: false, PressProcess: false, CustomerReturn: '', OtherDept: '' },
                         status: { Initial: false, RepeatCount: 0, Unknown: false }
                     },
+                    d2: { containmentChecks: { production: false, warehouse: false, inTransit: false, customerSite: false } },
                     d3: { actions: [] },
                     d4: {
                         fishbone: { machine: [], material: [], method: [], man: [], mold: [], environment: [] },
@@ -880,9 +882,8 @@
                     }
                     if (!company.memory.parsedFmeaSheets) { company.memory.parsedFmeaSheets = []; changed = true; }
                     if (!company.memory.parsedLLSheets) { company.memory.parsedLLSheets = []; changed = true; }
-                    if (!company.memory.past8DRecords) { company.memory.past8DRecords = [];
-                        changed = true;
-                    }
+                    if (!company.memory.past8DRecords) { company.memory.past8DRecords = []; changed = true; }
+                    if (!company.operators) { company.operators = []; changed = true; }
                 });
 
                 if (changed) {
@@ -969,6 +970,22 @@
                     this.reports.forEach(r => {
                         if (r.header && r.header.process === undefined) {
                             r.header.process = '';
+                            rChanged = true;
+                        }
+                        // Migration: whoMade/whoCaught alanları
+                        if (r.problem && r.problem.whoMade === undefined) {
+                            r.problem.whoMade = '';
+                            r.problem.whoCaught = '';
+                            rChanged = true;
+                        }
+                        // Migration: okPartImage
+                        if (r.okPartImage === undefined) {
+                            r.okPartImage = '';
+                            rChanged = true;
+                        }
+                        // Migration: d2 containment checks
+                        if (!r.d2) {
+                            r.d2 = { containmentChecks: { production: false, warehouse: false, inTransit: false, customerSite: false } };
                             rChanged = true;
                         }
                         // Backfill: header.process boşsa details.detection checkboxlarından al
@@ -1069,6 +1086,9 @@
                                     </button>
                                     <button onclick="app.switchCompanyHubTab('users')" id="ch-tab-users" class="text-left px-4 py-3 rounded-xl font-bold flex items-center gap-3 text-slate-500 hover:bg-slate-50 transition-all">
                                         <i class="fa-solid fa-users-gear w-5 text-center"></i> Kullanıcı Yönetimi
+                                    </button>
+                                    <button onclick="app.switchCompanyHubTab('operators')" id="ch-tab-operators" class="text-left px-4 py-3 rounded-xl font-bold flex items-center gap-3 text-slate-500 hover:bg-slate-50 transition-all">
+                                        <i class="fa-solid fa-id-badge w-5 text-center"></i> Operatör Listesi
                                     </button>
                                     <button onclick="app.switchCompanyHubTab('processes')" id="ch-tab-processes" class="text-left px-4 py-3 rounded-xl font-bold flex items-center gap-3 text-slate-500 hover:bg-slate-50 transition-all">
                                         <i class="fa-solid fa-network-wired w-5 text-center"></i> Proses Ağacı
@@ -1172,6 +1192,29 @@
                                     <!-- User List Container -->
                                     <div id="ch-user-list-container" class="space-y-3">
                                         <!-- Populated via renderUserList() -->
+                                    </div>
+                                </div>
+                                <!-- Operator Management -->
+                                <div id="ch-content-operators" class="ch-content-section hidden space-y-6">
+                                    <div class="flex justify-between items-center border-b border-slate-100 pb-4 mb-6">
+                                        <div>
+                                            <h3 class="text-2xl font-black text-slate-800">Operatör Listesi</h3>
+                                            <p class="text-sm text-slate-500 mt-1">Üretim operatörlerini buradan yönetin. Bu liste 8D raporlarında kullanılır.</p>
+                                        </div>
+                                    </div>
+                                    <!-- Add Operator -->
+                                    <div class="flex gap-3 items-end">
+                                        <div class="flex-grow">
+                                            <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Yeni Operatör Adı</label>
+                                            <input type="text" id="ch-new-operator" class="w-full px-4 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none" placeholder="Ad Soyad">
+                                        </div>
+                                        <button onclick="app.addOperator()" class="bg-blue-600 text-white px-6 py-2 rounded-xl font-bold hover:bg-blue-700 transition-all shadow-md text-sm flex items-center gap-2 h-[38px]">
+                                            <i class="fa-solid fa-plus"></i> Ekle
+                                        </button>
+                                    </div>
+                                    <!-- Operator List -->
+                                    <div id="ch-operator-list" class="space-y-2">
+                                        <!-- Populated via renderOperatorList() -->
                                     </div>
                                 </div>
                                 <!-- Process Tree -->
@@ -1503,7 +1546,7 @@
             },
 
             switchCompanyHubTab(tabName) {
-                ['profile', 'users', 'processes', 'memory'].forEach(t => {
+                ['profile', 'users', 'operators', 'processes', 'memory'].forEach(t => {
                     const btn = document.getElementById('ch-tab-' + t);
                     if (btn) {
                         btn.className = (t === tabName)
@@ -1535,12 +1578,75 @@
                     }
                 } else if (tabName === 'users') {
                     this.renderUserList();
+                } else if (tabName === 'operators') {
+                    this.renderOperatorList();
                 } else if (tabName === 'processes') {
                     this.renderProcessCards();
                     this.renderCompanyDefinitions();
                 } else if (tabName === 'memory') {
                     this.switchMemoryTab(this._memoryTab || 'fmea');
                 }
+            },
+
+            addOperator() {
+                const input = document.getElementById('ch-new-operator');
+                const name = input?.value?.trim();
+                if (!name) { this._showInfoToast('Operatör adı giriniz.', 'error'); return; }
+
+                const company = this.companies.find(c => c.id === this.activeCompanyId);
+                if (!company) return;
+                if (!company.operators) company.operators = [];
+
+                if (company.operators.includes(name)) {
+                    this._showInfoToast('Bu operatör zaten listede.', 'error');
+                    return;
+                }
+
+                company.operators.push(name);
+                company.operators.sort((a, b) => a.localeCompare(b, 'tr'));
+                this.saveCompanies();
+                input.value = '';
+                this.renderOperatorList();
+                this._showInfoToast(`"${name}" operatör listesine eklendi.`);
+            },
+
+            removeOperator(index) {
+                const company = this.companies.find(c => c.id === this.activeCompanyId);
+                if (!company || !company.operators) return;
+                const name = company.operators[index];
+                if (confirm(`"${name}" operatörünü listeden silmek istediğinize emin misiniz?`)) {
+                    company.operators.splice(index, 1);
+                    this.saveCompanies();
+                    this.renderOperatorList();
+                }
+            },
+
+            renderOperatorList() {
+                const container = document.getElementById('ch-operator-list');
+                if (!container) return;
+                const company = this.companies.find(c => c.id === this.activeCompanyId);
+                const operators = company?.operators || [];
+
+                if (operators.length === 0) {
+                    container.innerHTML = '<div class="text-center py-8 text-slate-400 italic font-medium">Henüz operatör eklenmemiş.</div>';
+                    return;
+                }
+
+                container.innerHTML = `
+                    <div class="text-xs text-slate-400 font-bold uppercase tracking-widest mb-3">${operators.length} Operatör</div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                        ${operators.map((op, i) => `
+                            <div class="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 group hover:border-blue-200 hover:bg-blue-50/30 transition-all">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center font-black text-sm">${op.charAt(0).toUpperCase()}</div>
+                                    <span class="text-sm font-semibold text-slate-700">${op}</span>
+                                </div>
+                                <button onclick="app.removeOperator(${i})" class="text-slate-300 hover:text-red-500 w-7 h-7 rounded-lg hover:bg-red-50 flex items-center justify-center transition-all opacity-0 group-hover:opacity-100">
+                                    <i class="fa-solid fa-times text-xs"></i>
+                                </button>
+                            </div>
+                        `).join('')}
+                    </div>`;
             },
 
             _memoryTab: 'fmea',
@@ -1603,12 +1709,6 @@
                 const modal = document.getElementById('new-8d-modal');
                 if (modal) {
                     modal.classList.remove('hidden');
-                    const targetInput = document.getElementById('new-8d-target');
-                    if (targetInput) {
-                        const target = new Date();
-                        target.setDate(target.getDate() + 15);
-                        targetInput.value = target.toISOString().split('T')[0];
-                    }
 
                     const company = this.companies.find(c => c.id === this.activeCompanyId);
 
@@ -1626,12 +1726,38 @@
                         processSelect.innerHTML = '<option value="">Seçiniz...</option>' +
                             (company.processes || []).map(p => `<option value="${p.name || p}">${p.name || p}</option>`).join('');
                     }
+
+                    // Pre-fill from pending edit data (backToCreationForm)
+                    const editData = this._pendingEditData;
+                    if (editData) {
+                        const h = editData.header;
+                        const setVal = (id, val) => { const el = document.getElementById(id); if (el && val) el.value = val; };
+                        setVal('new-8d-part', h.partName);
+                        setVal('new-8d-part-no', h.partNo);
+                        setVal('new-8d-lot-no', h.lotNo);
+                        setVal('new-8d-quantity', h.quantity);
+                        setVal('new-8d-customer', h.customer);
+                        setVal('new-8d-invoice', h.invoiceNo);
+                        setVal('new-8d-desc', h.problemDesc);
+                        setVal('new-8d-target', editData.targetDate);
+                        setVal('new-8d-process', h.process);
+                        if (leaderSelect && editData.leader) leaderSelect.value = editData.leader;
+                    } else {
+                        // New report — set default target date
+                        const targetInput = document.getElementById('new-8d-target');
+                        if (targetInput) {
+                            const target = new Date();
+                            target.setDate(target.getDate() + 15);
+                            targetInput.value = target.toISOString().split('T')[0];
+                        }
+                    }
                 }
             },
 
             hideNew8DModal() {
                 const modal = document.getElementById('new-8d-modal');
                 if (modal) modal.classList.add('hidden');
+                this._pendingEditData = null;
             },
 
             finalizeNew8D() {
@@ -1651,6 +1777,30 @@
                     return;
                 }
 
+                // Check if editing existing report
+                const editId = this._pendingEditData?.reportId || this.activeReportId;
+                const existingReport = editId ? this.reports.find(r => r.id === editId) : null;
+                if (existingReport && (existingReport.currentStep || 0) < 2) {
+                    // Update existing report
+                    existingReport.header.partName = partName;
+                    existingReport.header.partNo = partNo;
+                    existingReport.header.lotNo = lotNo;
+                    existingReport.header.quantity = quantity;
+                    existingReport.header.customer = customer;
+                    existingReport.header.invoiceNo = invoiceNo;
+                    existingReport.header.process = processName;
+                    existingReport.header.problemDesc = problemDesc;
+                    existingReport.problem.what = problemDesc;
+                    existingReport.leader = leader;
+                    existingReport.targetDate = targetDate;
+
+                    this.saveToStorage();
+                    this.hideNew8DModal();
+                    this.load8D(existingReport.id);
+                    this._showInfoToast('Giriş bilgileri güncellendi.');
+                    return;
+                }
+
                 const report = this.getNewReportTemplate(this.pendingType || 'internal');
                 report.header.partName = partName;
                 report.header.partNo = partNo;
@@ -1660,7 +1810,7 @@
                 report.header.invoiceNo = invoiceNo;
                 report.header.process = processName;
                 report.header.problemDesc = problemDesc;
-                report.problem.what = problemDesc; // Sync modal desc to D2 what field too
+                report.problem.what = problemDesc;
                 report.leader = leader;
                 report.targetDate = targetDate;
 
@@ -1734,6 +1884,61 @@
                 return errors;
             },
 
+            toggleContainmentCheck(key) {
+                if (!this.data.d2) this.data.d2 = { containmentChecks: { production: false, warehouse: false, inTransit: false, customerSite: false } };
+                this.data.d2.containmentChecks[key] = !this.data.d2.containmentChecks[key];
+                this.saveToStorage();
+                this.renderView();
+            },
+
+            _showContainmentWarning() {
+                return new Promise((resolve) => {
+                    window._containmentResolve = resolve;
+                    const checks = this.data.d2?.containmentChecks || {};
+                    const labels = { production: 'Üretim Alanı', warehouse: 'Depo', inTransit: 'Yoldaki Ürünler', customerSite: 'Müşteri Sahası' };
+                    const missing = Object.entries(labels).filter(([k]) => !checks[k]).map(([, v]) => v);
+
+                    const overlay = document.createElement('div');
+                    overlay.id = '_containment-warning';
+                    overlay.className = 'fixed inset-0 bg-black/30 backdrop-blur-sm z-[9999] flex items-center justify-center animate-fade-in';
+                    overlay.innerHTML = `
+                        <div class="bg-white rounded-3xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
+                            <div class="bg-gradient-to-r from-amber-500 to-orange-500 p-5 flex items-center gap-4">
+                                <div class="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                                    <i class="fa-solid fa-triangle-exclamation text-white text-2xl"></i>
+                                </div>
+                                <div>
+                                    <h3 class="text-white font-black text-lg">Tarama Kontrolleri Eksik</h3>
+                                    <p class="text-white/80 text-xs font-medium">Aşağıdaki alanlarda kontrol yapılmadı</p>
+                                </div>
+                            </div>
+                            <div class="p-6">
+                                <div class="space-y-2 mb-6">
+                                    ${missing.map(m => `
+                                        <div class="flex items-center gap-3 bg-red-50 border border-red-100 rounded-xl px-4 py-2.5">
+                                            <div class="w-6 h-6 rounded-full bg-red-400 flex items-center justify-center">
+                                                <i class="fa-solid fa-xmark text-white text-[10px]"></i>
+                                            </div>
+                                            <span class="text-sm font-bold text-red-700">${m}</span>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                                <p class="text-xs text-slate-500 italic mb-6 leading-relaxed">Hatalı parça tarama kontrolleri tamamlanmadan D3 adımına geçmek istiyor musunuz?</p>
+                                <div class="flex gap-3">
+                                    <button onclick="document.getElementById('_containment-warning').remove(); window._containmentResolve(false)" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 rounded-xl transition-all text-sm">
+                                        Geri Dön
+                                    </button>
+                                    <button onclick="document.getElementById('_containment-warning').remove(); window._containmentResolve(true)" class="flex-1 bg-amber-500 hover:bg-amber-600 text-white font-bold py-3 rounded-xl transition-all text-sm shadow-lg shadow-amber-500/30">
+                                        Yine de Geç
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    document.body.appendChild(overlay);
+                });
+            },
+
             _showValidationToast(errors) {
                 const existing = document.getElementById('_validation-toast');
                 if (existing) existing.remove();
@@ -1761,6 +1966,16 @@
                         if (errors.length > 0) {
                             this._showValidationToast(errors);
                             return;
+                        }
+                    }
+
+                    // D2→D3 containment check warning
+                    if (this.currentStep === 2 && stepIndex === 3) {
+                        const checks = this.data.d2?.containmentChecks || {};
+                        const allChecked = checks.production && checks.warehouse && checks.inTransit && checks.customerSite;
+                        if (!allChecked) {
+                            const proceed = await this._showContainmentWarning();
+                            if (!proceed) return;
                         }
                     }
 
@@ -1852,7 +2067,7 @@
                 const container = document.getElementById('stepper-container');
                 if (!container) return;
 
-                if (this.currentStep <= 0) {
+                if (this.currentStep < 0) {
                     container.classList.add('hidden');
                     return;
                 } else {
@@ -2760,8 +2975,8 @@
                             <div class="space-y-4">
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div class="space-y-1.5">
-                                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Problem / Parça Adı</label>
-                                        <input type="text" id="new-8d-part" class="form-input focus:ring-4 focus:ring-blue-500/10 placeholder:text-slate-300" placeholder="Örn: Ön Tampon Çizik">
+                                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">PARCA ADI</label>
+                                        <input type="text" id="new-8d-part" class="form-input focus:ring-4 focus:ring-blue-500/10 placeholder:text-slate-300" placeholder="Örn: Ön Tampon">
                                     </div>
                                     <div class="space-y-1.5">
                                         <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Parça No</label>
@@ -3002,8 +3217,42 @@
                 </div>
 
                 ${this.renderNavigation(0)}
+
+                <!-- Geri Dönüş Butonu -->
+                <div class="flex flex-col items-center mt-6 gap-2">
+                    ${(this.data.currentStep || 0) >= 2 ? `
+                        <button disabled class="flex items-center gap-2 text-slate-300 font-bold text-xs uppercase tracking-widest border border-slate-100 px-6 py-3 rounded-xl bg-slate-50 cursor-not-allowed">
+                            <i class="fa-solid fa-pen-to-square text-[10px]"></i>
+                            <span>Giriş Bilgilerini Düzenle</span>
+                        </button>
+                        <p class="text-[10px] text-amber-500 font-semibold italic"><i class="fa-solid fa-triangle-exclamation mr-1"></i>D2 adımı başladığı için giriş bilgileri düzenlenemez.</p>
+                    ` : `
+                        <button onclick="app.backToCreationForm()" class="flex items-center gap-2 text-slate-400 hover:text-amber-600 font-bold text-xs uppercase tracking-widest transition-all group border border-slate-200 hover:border-amber-200 px-6 py-3 rounded-xl hover:bg-amber-50">
+                            <i class="fa-solid fa-pen-to-square text-[10px] transition-transform"></i>
+                            <span>Giriş Bilgilerini Düzenle</span>
+                        </button>
+                    `}
+                </div>
             </div>
         `;
+            },
+
+            backToCreationForm() {
+                const role = this.activeUserRole;
+                if (role === 'Yönetici' || role === 'Lider') {
+                    // Mevcut rapor bilgilerini sakla
+                    this._pendingEditData = {
+                        reportId: this.activeReportId,
+                        header: JSON.parse(JSON.stringify(this.data.header)),
+                        leader: this.data.leader,
+                        targetDate: this.data.targetDate
+                    };
+                    this.pendingType = this.data.header.type || 'internal';
+                    this.goToDashboard();
+                    setTimeout(() => this.showNew8DModal(), 100);
+                } else {
+                    this._showInfoToast('Bu işlem için Yönetici veya Lider yetkisi gereklidir.', 'error');
+                }
             },
 
             addTeamMember() {
@@ -3141,7 +3390,47 @@
                     </div>
                     <div class="space-y-1">
                         <label class="text-xs font-black text-slate-400 uppercase tracking-widest px-1">Kim (Who)</label>
-                        <textarea class="form-input w-full min-h-[80px] resize-none whitespace-pre-wrap break-words leading-relaxed" onchange="app.updateProblem('who', this.value)" placeholder="Hata kim tarafından bulundu?">${p.who}</textarea>
+                        ${p.who && !p.whoMade && !p.whoCaught ? `<div class="text-[10px] text-amber-500 italic mb-1 px-1"><i class="fa-solid fa-info-circle mr-1"></i>Eski kayıt: "${p.who}"</div>` : ''}
+                        <div class="grid grid-cols-2 gap-3">
+                            <!-- Hatayı Yapan -->
+                            <div class="bg-red-50/50 border border-red-100 rounded-xl p-3">
+                                <label class="text-[10px] font-black text-red-400 uppercase tracking-widest mb-1.5 block"><i class="fa-solid fa-user-xmark mr-1"></i>Hatayı Yapan</label>
+                                ${(() => {
+                                    const company = this.companies.find(c => c.id === this.activeCompanyId);
+                                    const operators = company?.operators || [];
+                                    return `
+                                        <select id="d1-who-made" onchange="app.selectOperator('whoMade', this.value)" class="form-input w-full text-sm mb-2">
+                                            <option value="">Seçiniz...</option>
+                                            ${operators.map(op => `<option value="${op}" ${p.whoMade === op ? 'selected' : ''}>${op}</option>`).join('')}
+                                            <option value="__new__">+ Yeni Operatör Ekle...</option>
+                                        </select>
+                                        <div id="d1-who-made-new" class="${p.whoMade && !operators.includes(p.whoMade) && p.whoMade !== '' ? '' : 'hidden'} flex gap-2">
+                                            <input type="text" id="d1-who-made-input" class="form-input flex-grow text-sm" placeholder="Ad Soyad" value="${p.whoMade && !operators.includes(p.whoMade) ? p.whoMade : ''}">
+                                            <button onclick="app.addNewOperatorFromD1('whoMade')" class="bg-red-500 text-white px-3 rounded-lg text-xs font-bold hover:bg-red-600 transition-all shrink-0">Kaydet</button>
+                                        </div>
+                                    `;
+                                })()}
+                            </div>
+                            <!-- Hatayı Yakalayan -->
+                            <div class="bg-green-50/50 border border-green-100 rounded-xl p-3">
+                                <label class="text-[10px] font-black text-green-500 uppercase tracking-widest mb-1.5 block"><i class="fa-solid fa-user-check mr-1"></i>Hatayı Yakalayan</label>
+                                ${(() => {
+                                    const company = this.companies.find(c => c.id === this.activeCompanyId);
+                                    const operators = company?.operators || [];
+                                    return `
+                                        <select id="d1-who-caught" onchange="app.selectOperator('whoCaught', this.value)" class="form-input w-full text-sm mb-2">
+                                            <option value="">Seçiniz...</option>
+                                            ${operators.map(op => `<option value="${op}" ${p.whoCaught === op ? 'selected' : ''}>${op}</option>`).join('')}
+                                            <option value="__new__">+ Yeni Operatör Ekle...</option>
+                                        </select>
+                                        <div id="d1-who-caught-new" class="${p.whoCaught && !operators.includes(p.whoCaught) && p.whoCaught !== '' ? '' : 'hidden'} flex gap-2">
+                                            <input type="text" id="d1-who-caught-input" class="form-input flex-grow text-sm" placeholder="Ad Soyad" value="${p.whoCaught && !operators.includes(p.whoCaught) ? p.whoCaught : ''}">
+                                            <button onclick="app.addNewOperatorFromD1('whoCaught')" class="bg-green-600 text-white px-3 rounded-lg text-xs font-bold hover:bg-green-700 transition-all shrink-0">Kaydet</button>
+                                        </div>
+                                    `;
+                                })()}
+                            </div>
+                        </div>
                     </div>
                     <div class="space-y-1">
                         <label class="text-xs font-black text-slate-400 uppercase tracking-widest px-1">Neden (Why - Görünür)</label>
@@ -3177,12 +3466,35 @@
                                     <div class="aspect-square rounded-xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center bg-white hover:border-primary hover:bg-blue-50 transition-all relative">
                                         <i class="fa-solid fa-cloud-arrow-up text-slate-300 text-2xl mb-2"></i>
                                         <span class="text-[9px] text-slate-400 font-bold px-2 text-center">${categories[i]}</span>
-                                        <input type="file" accept="image/*" class="absolute inset-0 opacity-0 cursor-pointer" onchange="app.handleImageUpload(event, '${categories[i]}')">
+                                        <input type="file" accept="image/*" class="absolute inset-0 opacity-0 cursor-pointer" onchange="app.handleImageUpload(event, '${categories[i]}', ${i})">
                                     </div>
                                 `;
                     }
                 }).join('')}
                     </div>
+                </div>
+
+                <div class="bg-green-50 p-6 rounded-2xl border-2 border-green-200 mb-8">
+                    <h3 class="font-bold text-green-700 mb-4 flex items-center gap-2">
+                        <i class="fa-solid fa-circle-check text-green-500"></i> Uygun Parca Fotografu (OK)
+                        <span class="text-xs font-normal text-green-500 ml-2">Gorsel egitim formu icin kullanilacaktir</span>
+                    </h3>
+                    ${this.data.okPartImage ? `
+                        <div class="relative group w-48 h-48 rounded-xl overflow-hidden border-2 border-green-400 shadow-md">
+                            <img src="${this.data.okPartImage}" class="w-full h-full object-cover">
+                            <div class="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button onclick="app.removeOkPartImage()" class="bg-red-500 text-white w-10 h-10 rounded-full flex items-center justify-center hover:bg-red-600 transition-colors">
+                                    <i class="fa-solid fa-trash-can"></i>
+                                </button>
+                            </div>
+                        </div>
+                    ` : `
+                        <div class="w-48 h-48 rounded-xl border-2 border-dashed border-green-300 flex flex-col items-center justify-center bg-white hover:border-green-500 hover:bg-green-50 transition-all relative cursor-pointer">
+                            <i class="fa-solid fa-cloud-arrow-up text-green-300 text-3xl mb-2"></i>
+                            <span class="text-xs text-green-500 font-bold text-center px-2">Uygun Parca Yukle</span>
+                            <input type="file" accept="image/*" class="absolute inset-0 opacity-0 cursor-pointer" onchange="app.handleOkPartImageUpload(event)">
+                        </div>
+                    `}
                 </div>
 
                 ${this.renderNavigation(1)}
@@ -3211,6 +3523,16 @@
 
             // D2: Acil Eylemler (Hızlı Aksiyonlar)
             renderD2(container) {
+                if (!this.data.d2) this.data.d2 = { containmentChecks: { production: false, warehouse: false, inTransit: false, customerSite: false } };
+                const checks = this.data.d2.containmentChecks;
+                const areas = [
+                    { key: 'production', label: 'Üretim Alanı', icon: 'fa-industry', desc: 'Hat üstü & WIP stok' },
+                    { key: 'warehouse', label: 'Depo', icon: 'fa-warehouse', desc: 'Hammadde & mamul depo' },
+                    { key: 'inTransit', label: 'Yoldaki Ürünler', icon: 'fa-truck-fast', desc: 'Sevkiyat & transit' },
+                    { key: 'customerSite', label: 'Müşteri Sahası', icon: 'fa-building-user', desc: 'Müşteri stoğu & hat' }
+                ];
+                const allChecked = areas.every(a => checks[a.key]);
+
                 container.innerHTML = `
             <div class="glass-panel p-8 animate-fade-in">
                 <div class="mb-6">
@@ -3218,12 +3540,179 @@
                     <p class="text-slate-500 italic text-sm">Problemin yayılmasını önlemek için alınacak acil aksiyonlar.</p>
                 </div>
 
+                <!-- Containment Kontrol Alanları -->
+                <div class="mb-8 bg-gradient-to-r from-slate-50 to-slate-100/50 rounded-2xl border-2 ${allChecked ? 'border-green-200' : 'border-amber-200'} p-6 shadow-sm">
+                    <div class="flex items-center gap-3 mb-5">
+                        <div class="w-10 h-10 rounded-xl ${allChecked ? 'bg-green-100' : 'bg-amber-100'} flex items-center justify-center transition-colors">
+                            <i class="fa-solid ${allChecked ? 'fa-shield-check text-green-600' : 'fa-magnifying-glass-location text-amber-600'} text-lg"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-black text-slate-800 text-sm tracking-tight">Hatalı Parça Tarama Kontrolleri</h3>
+                            <p class="text-[11px] text-slate-500 italic">Aşağıdaki alanların tamamında hatalı parça taraması yapılmalıdır.</p>
+                        </div>
+                        ${allChecked ? '<span class="ml-auto bg-green-100 text-green-700 text-[10px] font-black px-3 py-1.5 rounded-full uppercase tracking-widest">Tamamlandı</span>' : ''}
+                    </div>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        ${areas.map(a => {
+                            const done = checks[a.key];
+                            return `
+                        <button onclick="app.toggleContainmentCheck('${a.key}')" class="relative flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all duration-300 cursor-pointer group
+                            ${done
+                                ? 'bg-green-50 border-green-300 shadow-md shadow-green-100'
+                                : 'bg-red-50/60 border-red-200 hover:border-red-300 hover:shadow-md hover:shadow-red-100'}">
+                            <div class="w-12 h-12 rounded-xl ${done ? 'bg-green-500 shadow-lg shadow-green-500/30' : 'bg-red-400/80 group-hover:bg-red-500 shadow-lg shadow-red-400/20'} flex items-center justify-center transition-all duration-300">
+                                <i class="fa-solid ${done ? 'fa-check' : a.icon} text-white text-lg transition-all"></i>
+                            </div>
+                            <span class="text-xs font-black ${done ? 'text-green-700' : 'text-red-600'} tracking-tight text-center transition-colors">${a.label}</span>
+                            <span class="text-[9px] ${done ? 'text-green-500' : 'text-red-400'} italic text-center leading-tight">${a.desc}</span>
+                            <div class="absolute top-2 right-2 w-5 h-5 rounded-full ${done ? 'bg-green-500' : 'bg-red-300'} flex items-center justify-center transition-all">
+                                <i class="fa-solid ${done ? 'fa-check' : 'fa-xmark'} text-white text-[8px]"></i>
+                            </div>
+                        </button>`;
+                        }).join('')}
+                    </div>
+                </div>
+
                 ${this.renderActionTable(this.data.d3.actions, 'd3')}
+
+                ${this.renderVisualTrainingForm()}
 
                 ${this.renderAIPanel(2)}
                 ${this.renderNavigation(2)}
             </div>
         `;
+            },
+
+            renderVisualTrainingForm() {
+                const okImg = this.data.okPartImage;
+                const ngImg = this.data.images && this.data.images[1] ? this.data.images[1].data : null;
+                const partName = this.data.header?.partName || 'Parca Adi';
+                const problemDesc = this.data.header?.problemDesc || this.data.problem?.what || 'Hata aciklamasi';
+                const company = this.companies?.find(c => c.id === this.activeCompanyId);
+                const operators = company?.operators || [];
+                const reportNo = this.data.id || this.data.header?.reportNo || '-';
+                const process = this.data.header?.process || '-';
+                const reportDate = this.data.header?.openDate || new Date().toISOString().split('T')[0];
+
+                if (!okImg && !ngImg) {
+                    return `
+                    <div class="mb-8 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200 p-8 text-center">
+                        <i class="fa-solid fa-image text-slate-300 text-4xl mb-3"></i>
+                        <p class="text-slate-400 font-bold text-sm">GORSEL EGITIM FORMU</p>
+                        <p class="text-slate-400 text-xs mt-1">D1 adiminda hata fotografini (2. slot) ve uygun parca fotografini yukleyerek gorsel egitim formunu olusturabilirsiniz.</p>
+                    </div>`;
+                }
+
+                const sigRow = (num) => `
+                    <tr class="border-b border-slate-100">
+                        <td class="py-1.5 px-3 text-xs text-slate-400 w-8 text-center">${num}</td>
+                        <td class="py-1.5 px-3"><div class="border-b border-dashed border-slate-300 h-5"></div></td>
+                        <td class="py-1.5 px-3"><div class="border-b border-dashed border-slate-300 h-5"></div></td>
+                    </tr>`;
+                const sigRows = [1,2,3,4,5].map(n => sigRow(n)).join('');
+
+                return `
+                <div class="mb-8 bg-white rounded-2xl border-2 border-slate-200 shadow-lg overflow-hidden">
+                    <!-- Header -->
+                    <div class="bg-gradient-to-r from-slate-800 to-slate-700 text-white p-5">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-4">
+                                ${company?.logo ? `<img src="${company.logo}" class="h-10 w-auto object-contain bg-white rounded-lg p-1">` : ''}
+                                <div>
+                                    <h3 class="font-black text-lg tracking-tight flex items-center gap-2">
+                                        <i class="fa-solid fa-chalkboard-user"></i> GORSEL EGITIM FORMU
+                                    </h3>
+                                    <p class="text-slate-300 text-xs mt-1">VISUAL TRAINING FORM</p>
+                                </div>
+                            </div>
+                            <button onclick="app.printVisualTrainingForm()" class="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2">
+                                <i class="fa-solid fa-print"></i> FORMU YAZDIR
+                            </button>
+                        </div>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 text-xs">
+                            <div><span class="text-slate-400">Firma:</span> <span class="font-bold">${company?.name || '-'}</span></div>
+                            <div><span class="text-slate-400">Rapor No:</span> <span class="font-bold">${reportNo}</span></div>
+                            <div><span class="text-slate-400">Parca:</span> <span class="font-bold">${partName}</span></div>
+                            <div><span class="text-slate-400">Tarih:</span> <span class="font-bold">${this.formatDate(reportDate)}</span></div>
+                        </div>
+                    </div>
+
+                    <!-- OK / NG Photos -->
+                    <div class="grid grid-cols-2 gap-0">
+                        <!-- OK Side -->
+                        <div class="bg-green-50 p-6 border-r border-slate-200">
+                            <div class="text-center mb-4">
+                                <span class="inline-flex items-center gap-2 bg-green-500 text-white px-5 py-2 rounded-full font-black text-sm shadow-lg shadow-green-500/30">
+                                    <i class="fa-solid fa-circle-check"></i> UYGUN PARCA (OK)
+                                </span>
+                            </div>
+                            <div class="aspect-[4/3] rounded-xl overflow-hidden border-4 border-green-400 shadow-lg bg-white flex items-center justify-center">
+                                ${okImg
+                                    ? `<img src="${okImg}" class="w-full h-full object-contain">`
+                                    : `<div class="text-center p-8">
+                                        <i class="fa-solid fa-image text-green-200 text-5xl mb-3"></i>
+                                        <p class="text-green-400 text-sm font-bold">D1'de uygun parca fotografi yukleyin</p>
+                                    </div>`
+                                }
+                            </div>
+                            <div class="text-center mt-3">
+                                <p class="font-black text-green-700 text-lg">${partName}</p>
+                                ${this.data.header?.partNo ? `<p class="text-green-500 text-xs font-bold">Ref: ${this.data.header.partNo}</p>` : ''}
+                            </div>
+                        </div>
+
+                        <!-- NG Side -->
+                        <div class="bg-red-50 p-6">
+                            <div class="text-center mb-4">
+                                <span class="inline-flex items-center gap-2 bg-red-500 text-white px-5 py-2 rounded-full font-black text-sm shadow-lg shadow-red-500/30">
+                                    <i class="fa-solid fa-circle-xmark"></i> UYGUNSUZ PARCA (NG)
+                                </span>
+                            </div>
+                            <div class="aspect-[4/3] rounded-xl overflow-hidden border-4 border-red-400 shadow-lg bg-white flex items-center justify-center">
+                                ${ngImg
+                                    ? `<img src="${ngImg}" class="w-full h-full object-contain">`
+                                    : `<div class="text-center p-8">
+                                        <i class="fa-solid fa-image text-red-200 text-5xl mb-3"></i>
+                                        <p class="text-red-400 text-sm font-bold">D1'de hata fotografi (2. slot) yukleyin</p>
+                                    </div>`
+                                }
+                            </div>
+                            <div class="text-center mt-3">
+                                <p class="font-black text-red-700 text-lg">${partName}</p>
+                                <p class="text-red-500 text-sm mt-1 italic">${problemDesc}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Operator Signature Table -->
+                    <div class="p-4 bg-slate-50 border-t border-slate-200">
+                        <h4 class="font-black text-slate-700 text-xs mb-2 flex items-center gap-2">
+                            <i class="fa-solid fa-user-pen text-slate-500"></i> EGITIM ALAN OPERATORLER
+                        </h4>
+                        <div class="grid grid-cols-2 gap-4">
+                            <table class="w-full">
+                                <thead>
+                                    <tr class="bg-slate-200 text-slate-600 text-[10px] font-black uppercase">
+                                        <th class="py-1 px-2 text-center rounded-tl-lg" style="width:10%">#</th>
+                                        <th class="py-1 px-3 text-left" style="width:50%">Ad Soyad</th>
+                                        <th class="py-1 px-3 text-left rounded-tr-lg" style="width:40%">Imza</th>
+                                    </tr>
+                                </thead>
+                                <tbody>${sigRows}</tbody>
+                            </table>
+                            <table class="w-full">
+                                <thead>
+                                    <tr class="bg-slate-200 text-slate-600 text-[10px] font-black uppercase">
+                                        <th class="py-1 px-2 text-center rounded-tl-lg" style="width:10%">#</th>
+                                        <th class="py-1 px-3 text-left" style="width:50%">Ad Soyad</th>
+                                        <th class="py-1 px-3 text-left rounded-tr-lg" style="width:40%">Imza</th>
+                                    </tr>
+                                </thead>
+                                <tbody>${[6,7,8,9,10].map(n => sigRow(n)).join('')}</tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>`;
             },
 
             // D3: Fishbone & AI Logic
@@ -3549,12 +4038,12 @@
 
                 <div class="grid grid-cols-1 gap-8">
                     <div class="bg-red-50/30 p-4 rounded-xl border border-red-100/50">
-                        <h3 class="font-black text-red-800 mb-4 flex items-center gap-2 uppercase tracking-widest text-[10px]"><i class="fa-solid fa-ban"></i> Hata Oluşumunu Engelleme (Occurrence)</h3>
+                        <h3 class="font-black text-red-800 mb-4 flex items-center gap-2 tracking-widest text-[10px]"><i class="fa-solid fa-ban"></i> HATA OLUŞUMUNU ENGELLEME (OCCURRENCE)</h3>
                         ${this.renderActionTable(this.data.d5.occurrenceActions, 'd5', 'occurrenceActions')}
                     </div>
 
                     <div class="bg-blue-50/30 p-4 rounded-xl border border-blue-100/50">
-                        <h3 class="font-black text-blue-800 mb-4 flex items-center gap-2 uppercase tracking-widest text-[10px]"><i class="fa-solid fa-magnifying-glass-chart"></i> Hata Tespiti (Detection)</h3>
+                        <h3 class="font-black text-blue-800 mb-4 flex items-center gap-2 tracking-widest text-[10px]"><i class="fa-solid fa-magnifying-glass-chart"></i> HATA TESPİTİ (DETECTION)</h3>
                         ${this.renderActionTable(this.data.d5.detectionActions, 'd5', 'detectionActions')}
                     </div>
                 </div>
@@ -3815,7 +4304,7 @@
                 const labels = [
                     "D0: DETAYLAR & EKİP",
                     "D1: 5N1K TANIMI",
-                    "D2: ACİL EYLEYMLER",
+                    "D2: ACİL EYLEMLER",
                     "D3: BALIK KILÇIĞI",
                     "D4: 5 NEDEN ANALİZİ",
                     "D5: AKSİYON PLANI",
@@ -4109,7 +4598,7 @@
 
             async callGeminiAPI(apiKey) {
                 const promptText = this.getAIPrompt();
-                const images = this.data.images || [];
+                const images = (this.data.images || []).filter(img => img !== null);
 
                 // Prepare Gemini contents (Multimodal)
                 const parts = [{ text: promptText }];
@@ -4649,7 +5138,7 @@
                     - Ne (What): ${p.what}
                     - Nerede (Where): ${p.where}
                     - Ne Zaman (When): ${[p.whenDate, p.whenTime, p.whenShift].filter(Boolean).join(' / ') || p.when || ''}
-                    - Kim (Who): ${p.who}
+                    - Kim (Who): Hatayı Yapan: ${p.whoMade || p.who || '-'}, Hatayı Yakalayan: ${p.whoCaught || '-'}
                     - Neden (Why): ${p.why}
                     - Nasıl (How): ${p.how}
                     Parça: ${h.partName}
@@ -4699,7 +5188,7 @@
                 const stepBadge = (num, title, color = 'bg-slate-800') => `
                     <div class="flex items-center gap-2 mb-2 print:mb-1">
                         <div class="${color} text-white font-black px-2 py-0.5 rounded text-[10px] tracking-tighter">D${num}</div>
-                        <div class="text-[10px] font-black uppercase tracking-wide text-slate-800">${title}</div>
+                        <div class="text-[10px] font-black tracking-wide text-slate-800" style="text-transform: none">${title}</div>
                     </div>
                 `;
 
@@ -4795,7 +5284,7 @@
                 };
 
                 const team = Array.isArray(d.team) ? d.team : [];
-                const problemImages = Array.isArray(d.images) ? d.images : [];
+                const problemImages = Array.isArray(d.images) ? d.images.filter(img => img !== null) : [];
                 const d3Actions = Array.isArray(d.d3?.actions) ? d.d3.actions : [];
                 const d5Actions = [
                     ...(Array.isArray(d.d5?.occurrenceActions) ? d.d5.occurrenceActions : []),
@@ -4868,9 +5357,11 @@
                                     <p class="italic">${d.problem?.what || '-'}</p>
                                     <p class="mt-2 font-black underline mb-1">Nerede / Nasıl:</p>
                                     <p class="italic">${d.problem?.where || '-'} / ${d.problem?.how || '-'}</p>
+                                    <p class="mt-2"><span class="font-black">Hatayı Yapan:</span> <span class="italic">${d.problem?.whoMade || d.problem?.who || '-'}</span> | <span class="font-black">Yakalayan:</span> <span class="italic">${d.problem?.whoCaught || '-'}</span></p>
                                 </div>
-                                <div class="flex gap-2 justify-end">
+                                <div class="flex gap-2 justify-end flex-wrap">
                                     ${problemImages.slice(0, 2).map(img => `<img src="${img.data}" class="h-20 w-auto border border-black shadow-sm">`).join('')}
+                                    ${d.okPartImage ? `<div class="relative"><img src="${d.okPartImage}" class="h-20 w-auto border-2 border-green-500 shadow-sm"><div class="absolute bottom-0 left-0 right-0 bg-green-500 text-white text-center text-[6px] font-black py-0.5">OK</div></div>` : ''}
                                 </div>
                             </div>
                          </div>
@@ -4902,6 +5393,26 @@
                         </table>
                     </div>
 
+                    <!-- VISUAL TRAINING FORM (mini) -->
+                    ${d.okPartImage && d.images && d.images[1] ? `
+                    <div class="border border-black p-2">
+                        <div class="text-[9px] font-black mb-2 text-center uppercase tracking-wider">Gorsel Egitim Formu / Visual Training Form</div>
+                        <div class="flex gap-2">
+                            <div class="flex-1 border-2 border-green-500 rounded p-2 text-center bg-green-50">
+                                <div class="text-[7px] font-black text-green-700 mb-1">&#10004; UYGUN (OK)</div>
+                                <img src="${d.okPartImage}" class="mx-auto max-h-24 object-contain">
+                                <div class="text-[7px] font-black text-green-700 mt-1">${h.partName || '-'}</div>
+                            </div>
+                            <div class="flex-1 border-2 border-red-500 rounded p-2 text-center bg-red-50">
+                                <div class="text-[7px] font-black text-red-700 mb-1">&#10008; UYGUNSUZ (NG)</div>
+                                <img src="${d.images[1].data}" class="mx-auto max-h-24 object-contain">
+                                <div class="text-[7px] font-black text-red-700 mt-1">${h.partName || '-'}</div>
+                                <div class="text-[6px] text-red-500 italic">${h.problemDesc || d.problem?.what || ''}</div>
+                            </div>
+                        </div>
+                    </div>
+                    ` : ''}
+
                     <!-- D3: FISHBONE ANALYSIS -->
                     <div class="border border-black p-2">
                         ${stepBadge('3', 'Kök Neden Analizi - Balık Kılçığı (Root Cause - Fishbone)')}
@@ -4915,11 +5426,11 @@
                         ${stepBadge('4', 'Kök Neden Analizi - 5 Neden (Root Cause - 5 Whys)')}
                         <div class="mt-2 space-y-4">
                             <div>
-                                <div class="text-[8px] font-black uppercase bg-slate-900 text-white p-1 mb-2 border border-black tracking-widest text-center">Hata Oluşum Nedeni (Occurrence)</div>
+                                <div class="text-[8px] font-black bg-slate-900 text-white p-1 mb-2 border border-black tracking-widest text-center">HATA OLUŞUM NEDENİ (OCCURRENCE)</div>
                                 ${renderWhys(d.d4?.rootCausesOccurrence)}
                             </div>
                             <div>
-                                <div class="text-[8px] font-black uppercase bg-slate-900 text-white p-1 mb-2 border border-black tracking-widest text-center">Hata Tespit Nedeni (Detection)</div>
+                                <div class="text-[8px] font-black bg-slate-900 text-white p-1 mb-2 border border-black tracking-widest text-center">HATA TESPİT NEDENİ (DETECTION)</div>
                                 ${renderWhys(d.d4?.rootCausesDetection)}
                             </div>
                         </div>
@@ -5016,12 +5527,12 @@
                                 <div class="text-[9px] font-bold text-center">-</div>
                             </div>
                             <div class="p-2 space-y-4">
-                                <div class="text-[8px] font-black uppercase text-center border-b border-black pb-1">Onay (Management)</div>
+                                <div class="text-[8px] font-black text-center border-b border-black pb-1">ONAY (MANAGEMENT)</div>
                                 <div class="h-10"></div>
                                 <div class="text-[9px] font-bold text-center">-</div>
                             </div>
                             <div class="p-2 space-y-4 bg-slate-50">
-                                <div class="text-[8px] font-black uppercase text-center border-b border-black pb-1">Rapor Durumu</div>
+                                <div class="text-[8px] font-black text-center border-b border-black pb-1">RAPOR DURUMU</div>
                                 <div class="h-10 flex items-center justify-center">
                                     <div class="border-2 border-black font-black text-xs px-2 py-1 rotate-[-5deg]">${isCompleted ? 'TEKNİK ONAYLI' : 'TASLAK'}</div>
                                 </div>
@@ -5034,7 +5545,7 @@
 
                 <div class="mt-4 pt-2 border-t border-slate-300 flex justify-between items-center opacity-70 italic text-[7px]">
                     <div>Form No: F-KAL-08D / Rev.02 / 2026</div>
-                    <div class="font-black uppercase tracking-widest text-[#333]">8D Problem Solving Methodology - Confidential</div>
+                    <div class="font-black tracking-widest text-[#333]">8D PROBLEM SOLVING METHODOLOGY - CONFIDENTIAL</div>
                 </div>
             </div>
         `;
@@ -5759,6 +6270,9 @@
                 // --- Performans Tablosu ---
                 const perfData = this.getPerformanceData(reports);
 
+                // --- Operatör Analitikleri ---
+                const operatorData = this.getOperatorAnalytics(reports);
+
                 // --- Tekrar Eden Sorunlar ---
                 const recurringIssues = this.getRecurringIssues(allReportsIncLL);
 
@@ -5910,6 +6424,83 @@
                         ${perfData.length > 0 ? this._renderPerfTable(perfData) : '<p class="text-sm text-slate-400 italic text-center py-8">Henüz aksiyon verisi bulunmuyor.</p>'}
                     </div>
 
+                    <!-- Operatör Tabloları -->
+                    ${operatorData.makers.length > 0 || operatorData.catchers.length > 0 ? `
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                        <!-- Hatayı Yapan Operatörler -->
+                        <div class="glass-panel p-6 shadow-xl border-none border-l-4 border-l-red-400">
+                            <h3 class="text-lg font-black text-slate-800 tracking-tight italic mb-4"><i class="fa-solid fa-user-xmark text-red-500 mr-2"></i>Hatayı Yapan Operatörler</h3>
+                            ${operatorData.makers.length > 0 ? `
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-sm">
+                                    <thead>
+                                        <tr class="border-b-2 border-red-100 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                            <th class="py-2 px-2 text-left">Operatör</th>
+                                            <th class="py-2 px-2 text-center">Toplam</th>
+                                            <th class="py-2 px-2 text-center">Son 30 Gün</th>
+                                            <th class="py-2 px-2 text-left">En Sık Proses</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-slate-100">
+                                        ${operatorData.makers.map((m, idx) => {
+                                            const bgClass = idx === 0 && operatorData.makers.length > 1 ? 'bg-red-50/50' : '';
+                                            const lastBg = idx === operatorData.makers.length - 1 && operatorData.makers.length > 1 ? 'bg-green-50/50' : '';
+                                            return `
+                                        <tr class="${bgClass || lastBg} hover:bg-slate-50 transition-colors">
+                                            <td class="py-2.5 px-2 font-semibold text-slate-700">
+                                                <div class="flex items-center gap-2">
+                                                    <div class="w-6 h-6 rounded-md ${idx === 0 && operatorData.makers.length > 1 ? 'bg-red-100 text-red-600' : 'bg-slate-100 text-slate-500'} flex items-center justify-center text-[10px] font-black">${idx + 1}</div>
+                                                    ${m.name}
+                                                </div>
+                                            </td>
+                                            <td class="py-2.5 px-2 text-center font-black ${idx === 0 && operatorData.makers.length > 1 ? 'text-red-600' : 'text-slate-700'}">${m.total}</td>
+                                            <td class="py-2.5 px-2 text-center text-xs ${m.recent > 0 ? 'text-amber-600 font-bold' : 'text-slate-400'}">${m.recent}</td>
+                                            <td class="py-2.5 px-2 text-xs text-slate-500">${m.topProcess}</td>
+                                        </tr>`;
+                                        }).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                            ` : '<p class="text-sm text-slate-400 italic text-center py-6">Veri yok</p>'}
+                        </div>
+                        <!-- Hatayı Yakalayan Operatörler -->
+                        <div class="glass-panel p-6 shadow-xl border-none border-l-4 border-l-green-400">
+                            <h3 class="text-lg font-black text-slate-800 tracking-tight italic mb-4"><i class="fa-solid fa-user-check text-green-500 mr-2"></i>Hatayı Yakalayan Operatörler</h3>
+                            ${operatorData.catchers.length > 0 ? `
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-sm">
+                                    <thead>
+                                        <tr class="border-b-2 border-green-100 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                            <th class="py-2 px-2 text-left">Operatör</th>
+                                            <th class="py-2 px-2 text-center">Toplam</th>
+                                            <th class="py-2 px-2 text-center">Son 30 Gün</th>
+                                            <th class="py-2 px-2 text-left">En Sık Proses</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-slate-100">
+                                        ${operatorData.catchers.map((c, idx) => {
+                                            const bgClass = idx === 0 && operatorData.catchers.length > 1 ? 'bg-green-50/50' : '';
+                                            return `
+                                        <tr class="${bgClass} hover:bg-slate-50 transition-colors">
+                                            <td class="py-2.5 px-2 font-semibold text-slate-700">
+                                                <div class="flex items-center gap-2">
+                                                    <div class="w-6 h-6 rounded-md ${idx === 0 ? 'bg-green-100 text-green-600' : 'bg-slate-100 text-slate-500'} flex items-center justify-center text-[10px] font-black">${idx + 1}</div>
+                                                    ${c.name}
+                                                </div>
+                                            </td>
+                                            <td class="py-2.5 px-2 text-center font-black ${idx === 0 ? 'text-green-600' : 'text-slate-700'}">${c.total}</td>
+                                            <td class="py-2.5 px-2 text-center text-xs ${c.recent > 0 ? 'text-green-600 font-bold' : 'text-slate-400'}">${c.recent}</td>
+                                            <td class="py-2.5 px-2 text-xs text-slate-500">${c.topProcess}</td>
+                                        </tr>`;
+                                        }).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                            ` : '<p class="text-sm text-slate-400 italic text-center py-6">Veri yok</p>'}
+                        </div>
+                    </div>
+                    ` : ''}
+
                     <!-- Tekrar Eden Sorun Uyarıları -->
                     ${recurringIssues.length > 0 ? `
                     <div class="glass-panel p-6 shadow-xl border-none mb-8 border-l-4 border-l-red-500">
@@ -6013,6 +6604,55 @@
                 return Object.values(personMap)
                     .map(p => ({ ...p, closeRate: p.total > 0 ? Math.round((p.closed / p.total) * 100) : 0 }))
                     .sort((a, b) => b.closeRate - a.closeRate || b.total - a.total);
+            },
+
+            getOperatorAnalytics(reports) {
+                const now = new Date();
+                const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+                const makersMap = {};
+                const catchersMap = {};
+
+                reports.forEach(r => {
+                    const p = r.problem;
+                    if (!p) return;
+                    const reportDate = r.createdAt ? new Date(r.createdAt) : null;
+                    const isRecent = reportDate && reportDate >= thirtyDaysAgo;
+                    const process = r.header?.process || '';
+
+                    // Hatayı yapan
+                    const maker = p.whoMade || '';
+                    if (maker) {
+                        if (!makersMap[maker]) makersMap[maker] = { name: maker, total: 0, recent: 0, processes: {} };
+                        makersMap[maker].total++;
+                        if (isRecent) makersMap[maker].recent++;
+                        if (process) makersMap[maker].processes[process] = (makersMap[maker].processes[process] || 0) + 1;
+                    }
+
+                    // Hatayı yakalayan
+                    const catcher = p.whoCaught || '';
+                    if (catcher) {
+                        if (!catchersMap[catcher]) catchersMap[catcher] = { name: catcher, total: 0, recent: 0, processes: {} };
+                        catchersMap[catcher].total++;
+                        if (isRecent) catchersMap[catcher].recent++;
+                        if (process) catchersMap[catcher].processes[process] = (catchersMap[catcher].processes[process] || 0) + 1;
+                    }
+                });
+
+                const getTopProcess = (processes) => {
+                    const entries = Object.entries(processes);
+                    if (entries.length === 0) return '-';
+                    return entries.sort((a, b) => b[1] - a[1])[0][0];
+                };
+
+                const makers = Object.values(makersMap)
+                    .map(m => ({ ...m, topProcess: getTopProcess(m.processes) }))
+                    .sort((a, b) => b.total - a.total);
+
+                const catchers = Object.values(catchersMap)
+                    .map(c => ({ ...c, topProcess: getTopProcess(c.processes) }))
+                    .sort((a, b) => b.total - a.total);
+
+                return { makers, catchers };
             },
 
             getRecurringIssues(allReports) {
@@ -7431,6 +8071,46 @@ LÜTFEN SADECE AŞAĞIDAKİ JSON FORMATINDA YANIT VER:
                 this.saveToStorage();
             },
 
+            selectOperator(field, value) {
+                if (value === '__new__') {
+                    // Show manual input
+                    const newDiv = document.getElementById(`d1-${field === 'whoMade' ? 'who-made' : 'who-caught'}-new`);
+                    if (newDiv) newDiv.classList.remove('hidden');
+                    return;
+                }
+                this.data.problem[field] = value;
+                this.saveToStorage();
+                // Hide manual input if visible
+                const newDiv = document.getElementById(`d1-${field === 'whoMade' ? 'who-made' : 'who-caught'}-new`);
+                if (newDiv) newDiv.classList.add('hidden');
+            },
+
+            addNewOperatorFromD1(field) {
+                const inputId = field === 'whoMade' ? 'd1-who-made-input' : 'd1-who-caught-input';
+                const input = document.getElementById(inputId);
+                const name = input?.value?.trim();
+                if (!name) { this._showInfoToast('Operatör adı giriniz.', 'error'); return; }
+
+                // Add to company operators list
+                const company = this.companies.find(c => c.id === this.activeCompanyId);
+                if (company) {
+                    if (!company.operators) company.operators = [];
+                    if (!company.operators.includes(name)) {
+                        company.operators.push(name);
+                        company.operators.sort((a, b) => a.localeCompare(b, 'tr'));
+                        this.saveCompanies();
+                    }
+                }
+
+                // Set the value in problem
+                this.data.problem[field] = name;
+                this.saveToStorage();
+
+                // Re-render to update dropdown
+                this.renderView();
+                this._showInfoToast(`"${name}" operatör listesine eklendi ve seçildi.`);
+            },
+
             // Fishbone Manipulation
             updateFishbone(cat, index, val) {
                 if (typeof this.data.d4.fishbone[cat][index] === 'string') {
@@ -7474,21 +8154,15 @@ LÜTFEN SADECE AŞAĞIDAKİ JSON FORMATINDA YANIT VER:
             },
 
             // Image Handlers
-            handleImageUpload(event, category) {
+            handleImageUpload(event, category, slotIndex) {
                 const files = event.target.files;
                 if (!files || files.length === 0) return;
-
-                if ((this.data.images || []).length >= 4) {
-                    alert("En fazla 4 adet fotoğraf yükleyebilirsiniz.");
-                    return;
-                }
 
                 const file = files[0];
                 const reader = new FileReader();
                 reader.onload = (e) => {
                     const img = new Image();
                     img.onload = () => {
-                        // Resizing logic for localStorage safety (max 800px width/height)
                         const canvas = document.createElement('canvas');
                         let width = img.width;
                         let height = img.height;
@@ -7507,7 +8181,11 @@ LÜTFEN SADECE AŞAĞIDAKİ JSON FORMATINDA YANIT VER:
 
                         const base64 = canvas.toDataURL('image/jpeg', 0.7);
                         if (!this.data.images) this.data.images = [];
-                        this.data.images.push({ category: category, data: base64, name: file.name });
+                        // Ensure array has enough slots
+                        while (this.data.images.length <= slotIndex) {
+                            this.data.images.push(null);
+                        }
+                        this.data.images[slotIndex] = { category: category, data: base64, name: file.name };
 
                         this.saveToStorage();
                         this.renderView();
@@ -7518,9 +8196,163 @@ LÜTFEN SADECE AŞAĞIDAKİ JSON FORMATINDA YANIT VER:
             },
 
             removeImage(index) {
-                this.data.images.splice(index, 1);
+                this.data.images[index] = null;
                 this.saveToStorage();
                 this.renderView();
+            },
+
+            handleOkPartImageUpload(event) {
+                const files = event.target.files;
+                if (!files || files.length === 0) return;
+                const file = files[0];
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        let width = img.width;
+                        let height = img.height;
+                        const max = 800;
+                        if (width > height) {
+                            if (width > max) { height *= max / width; width = max; }
+                        } else {
+                            if (height > max) { width *= max / height; height = max; }
+                        }
+                        canvas.width = width;
+                        canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, width, height);
+                        this.data.okPartImage = canvas.toDataURL('image/jpeg', 0.7);
+                        this.saveToStorage();
+                        this.renderView();
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            },
+
+            removeOkPartImage() {
+                this.data.okPartImage = '';
+                this.saveToStorage();
+                this.renderView();
+            },
+
+            printVisualTrainingForm() {
+                const okImg = this.data.okPartImage;
+                const ngImg = this.data.images && this.data.images[1] ? this.data.images[1].data : null;
+                const partName = this.data.header?.partName || 'Parca Adi';
+                const problemDesc = this.data.header?.problemDesc || this.data.problem?.what || '';
+                const company = this.companies?.find(c => c.id === this.activeCompanyId);
+                const operators = company?.operators || [];
+                const reportNo = this.data.id || this.data.header?.reportNo || '-';
+                const process = this.data.header?.process || '-';
+                const reportDate = this.data.header?.openDate || new Date().toISOString().split('T')[0];
+
+                const formattedDate = this.formatDate(reportDate);
+                const printSigRow = (num) => `<tr><td style="padding:4px 8px;border:1px solid #d1d5db;text-align:center;font-size:10px;color:#94a3b8;width:8%">${num}</td><td style="padding:4px 8px;border:1px solid #d1d5db;width:42%">&nbsp;</td><td style="padding:4px 8px;border:1px solid #d1d5db;width:50%">&nbsp;</td></tr>`;
+
+                const html = `<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<title>Gorsel Egitim Formu - ${reportNo}</title>
+<style>
+@page { size: A4 landscape; margin: 10mm; }
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+body { font-family: Arial, Helvetica, sans-serif; color: #1e293b; width: 277mm; height: 190mm; display: flex; flex-direction: column; overflow: hidden; }
+.header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #1e293b; padding-bottom: 6px; margin-bottom: 6px; flex-shrink: 0; }
+.header-left { display: flex; align-items: center; gap: 10px; }
+.header-left img { height: 32px; width: auto; object-fit: contain; }
+.header-left h1 { font-size: 15px; font-weight: 900; letter-spacing: 1px; }
+.header-left p { font-size: 9px; color: #64748b; margin-top: 1px; }
+.header-right { text-align: right; font-size: 9px; color: #475569; }
+.header-right div { margin-bottom: 1px; }
+.header-right span { font-weight: 700; }
+.info-bar { display: flex; gap: 16px; background: #f1f5f9; padding: 5px 10px; border-radius: 4px; font-size: 10px; margin-bottom: 6px; flex-shrink: 0; }
+.info-bar .label { color: #64748b; }
+.info-bar .value { font-weight: 700; }
+.photos { display: flex; gap: 8px; margin-bottom: 6px; flex: 1; min-height: 0; }
+.photo-side { flex: 1; padding: 10px; text-align: center; display: flex; flex-direction: column; }
+.photo-ok { background: #f0fdf4; border: 3px solid #22c55e; border-radius: 10px; }
+.photo-ng { background: #fef2f2; border: 3px solid #ef4444; border-radius: 10px; }
+.photo-badge { display: inline-block; padding: 4px 16px; border-radius: 16px; color: white; font-weight: 900; font-size: 12px; margin-bottom: 6px; letter-spacing: 0.5px; flex-shrink: 0; }
+.badge-ok { background: #22c55e; }
+.badge-ng { background: #ef4444; }
+.photo-frame { width: 100%; flex: 1; min-height: 0; border-radius: 6px; overflow: hidden; display: flex; align-items: center; justify-content: center; margin: 0 auto; }
+.photo-frame img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.photo-placeholder { color: #9ca3af; font-size: 11px; padding: 40px 16px; }
+.photo-label { font-weight: 900; font-size: 14px; margin-top: 6px; flex-shrink: 0; }
+.photo-label-ok { color: #15803d; }
+.photo-label-ng { color: #dc2626; }
+.defect-desc { color: #ef4444; font-style: italic; font-size: 10px; margin-top: 2px; flex-shrink: 0; }
+.sig-section { margin-top: 4px; flex-shrink: 0; }
+.sig-section h3 { font-size: 10px; font-weight: 900; margin-bottom: 3px; text-transform: uppercase; letter-spacing: 1px; }
+.sig-grid { display: flex; gap: 10px; }
+.sig-grid table { flex: 1; border-collapse: collapse; }
+th { background: #e2e8f0; padding: 3px 6px; text-align: left; font-size: 9px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.5px; border: 1px solid #d1d5db; }
+td { padding: 3px 6px; border: 1px solid #d1d5db; }
+</style>
+</head>
+<body>
+<div class="header">
+    <div class="header-left">
+        ${company?.logo ? `<img src="${company.logo}">` : ''}
+        <div>
+            <h1>GORSEL EGITIM FORMU</h1>
+            <p>VISUAL TRAINING FORM</p>
+        </div>
+    </div>
+    <div class="header-right">
+        <div>Firma: <span>${company?.name || '-'}</span></div>
+        <div>Rapor No: <span>${reportNo}</span></div>
+        <div>Tarih: <span>${formattedDate}</span></div>
+    </div>
+</div>
+
+<div class="info-bar">
+    <div><span class="label">Parca:</span> <span class="value">${partName}</span></div>
+    <div><span class="label">Proses:</span> <span class="value">${process}</span></div>
+    <div><span class="label">Hata Tanimi:</span> <span class="value">${problemDesc || '-'}</span></div>
+</div>
+
+<div class="photos">
+    <div class="photo-side photo-ok">
+        <div class="photo-badge badge-ok">&#10004; UYGUN PARCA (OK)</div>
+        <div class="photo-frame">
+            ${okImg ? `<img src="${okImg}">` : '<div class="photo-placeholder">Fotograf yuklenmedi</div>'}
+        </div>
+        <div class="photo-label photo-label-ok">${partName}</div>
+    </div>
+    <div class="photo-side photo-ng">
+        <div class="photo-badge badge-ng">&#10008; UYGUNSUZ PARCA (NG)</div>
+        <div class="photo-frame">
+            ${ngImg ? `<img src="${ngImg}">` : '<div class="photo-placeholder">Fotograf yuklenmedi</div>'}
+        </div>
+        <div class="photo-label photo-label-ng">${partName}</div>
+        ${problemDesc ? `<div class="defect-desc">${problemDesc}</div>` : ''}
+    </div>
+</div>
+
+<div class="sig-section">
+    <h3>Egitim Alan Operatorler</h3>
+    <div class="sig-grid">
+        <table>
+            <thead><tr><th style="width:8%">#</th><th style="width:42%">Ad Soyad</th><th style="width:50%">Imza</th></tr></thead>
+            <tbody>${[1,2,3,4,5].map(n => printSigRow(n)).join('')}</tbody>
+        </table>
+        <table>
+            <thead><tr><th style="width:8%">#</th><th style="width:42%">Ad Soyad</th><th style="width:50%">Imza</th></tr></thead>
+            <tbody>${[6,7,8,9,10].map(n => printSigRow(n)).join('')}</tbody>
+        </table>
+    </div>
+</div>
+</body>
+</html>`;
+
+                const printWindow = window.open('', '_blank');
+                printWindow.document.write(html);
+                printWindow.document.close();
+                setTimeout(() => printWindow.print(), 500);
             },
 
             // --- Company Management Functions ---
