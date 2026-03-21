@@ -630,6 +630,15 @@
         const APP_VERSION = 'beta-0.1.0';
         const BUILD_DATE = '2026-03-03';
 
+        const DEFAULT_SUB_M = {
+            man:         ['Egitim', 'Beceri/Yetkinlik', 'Dikkat/Yorgunluk', 'Motivasyon', 'Calisma Sekli', 'Fiziksel Durum'],
+            machine:     ['Bakim', 'Asinti/Yipranma', 'Kalibrasyon', 'Yasi/Teknoloji', 'Ayar/Setup', 'Kapasite'],
+            material:    ['Tedarikci Kalitesi', 'Spesifikasyon', 'Depolama', 'Parti Farkliligi', 'Kontaminasyon', 'Raf Omru'],
+            method:      ['Standart Islem/SOP', 'Proses Tasarimi', 'Is Sirasi', 'Parametre', 'Degisiklik Yonetimi', 'Calisma Talimati'],
+            mold:        ['Kalibrasyon', 'Asinti/Yipranma', 'Tasarim', 'Bakim', 'Isi Yonetimi', 'Yuzey Durumu'],
+            environment: ['Sicaklik', 'Nem', 'Aydinlatma', 'Temizlik/5S', 'Gurultu/Titresim', 'Yerlesim/Ergonomi']
+        };
+
         const app = {
             // State
             currentStep: -1, // -1 means Dashboard, -2 means Company Login
@@ -751,7 +760,8 @@
                         processes: [],
                         departments: ['Üretim', 'Kalite', 'Mühendislik'],
                         facilityLocations: ['Merkez Fabrika'],
-                        memory: { past8D: [], fmeaRecords: [], lessonsLearned: [], documents: [], parsedFmeaSheets: [], parsedLLSheets: [], past8DRecords: [] }
+                        memory: { past8D: [], fmeaRecords: [], lessonsLearned: [], documents: [], parsedFmeaSheets: [], parsedLLSheets: [], past8DRecords: [] },
+                        subMCategories: null
                     };
                     this.companies.push(defaultCompany);
                     this.saveCompanies();
@@ -884,6 +894,7 @@
                     if (!company.memory.parsedLLSheets) { company.memory.parsedLLSheets = []; changed = true; }
                     if (!company.memory.past8DRecords) { company.memory.past8DRecords = []; changed = true; }
                     if (!company.operators) { company.operators = []; changed = true; }
+                    if (company.subMCategories === undefined) { company.subMCategories = null; changed = true; }
                 });
 
                 if (changed) {
@@ -998,6 +1009,35 @@
                                 rChanged = true;
                             }
                         }
+
+                        // Migration: fishbone subCategory atama (keyword tabanlı)
+                        if (r.d4?.fishbone) {
+                            const subMKeywords = {
+                                man: { 'Egitim': ['eğitim','training','bilgi','yetiştirilm'], 'Beceri/Yetkinlik': ['beceri','yetkinlik','tecrübe','deneyim','uzman'], 'Dikkat/Yorgunluk': ['dikkat','yorgun','dalgın','ihmal','konsantr','uykusuz','farkında'], 'Motivasyon': ['motivasyon','isteksiz','umursamaz'], 'Calisma Sekli': ['çalışma','vardiya','mesai','tempo','yoğun','acele'], 'Fiziksel Durum': ['fiziksel','sağlık','görme','ergonomi'] },
+                                machine: { 'Bakim': ['bakım','maintenance','arıza','periyodik','tamir'], 'Asinti/Yipranma': ['aşın','yıpran','wear','eskimiş','ömür'], 'Kalibrasyon': ['kalibrasyon','ölçüm','hassas','doğruluk','ayar.*ölçü'], 'Yasi/Teknoloji': ['yaş','eski.*makine','teknoloji','model','yıl'], 'Ayar/Setup': ['ayar','setup','parametre.*makine','kurulum','devreye'], 'Kapasite': ['kapasite','hız','çevrim','üstün.*yük'] },
+                                material: { 'Tedarikci Kalitesi': ['tedarik','supplier','gelen.*kalite','girdi','yan sanayi'], 'Spesifikasyon': ['spesifik','spec','özellik','tolerans','uygun.*değil'], 'Depolama': ['depola','stok','saklama','ortam.*malzeme','nem.*malzeme'], 'Parti Farkliligi': ['parti','lot','batch','farklılık.*malzeme','homojen'], 'Kontaminasyon': ['kontamin','kirli','yabancı.*madde','karışım','bulaş'], 'Raf Omru': ['raf.*ömr','son kullan','expire','bozulm'] },
+                                method: { 'Standart Islem/SOP': ['sop','standart.*işlem','talimat','prosedür','iş.*talimat'], 'Proses Tasarimi': ['proses.*tasarım','akış','dizayn','tasarım.*hata'], 'Is Sirasi': ['sıra','sıralama','öncelik','adım.*atlama','basamak'], 'Parametre': ['parametre','sıcaklık','basınç','hız','devir','zaman.*ayar'], 'Degisiklik Yonetimi': ['değişik','revizyon','güncellen','eski.*method','yeni.*devreye'], 'Calisma Talimati': ['talimat','yönerg','doküman','yazılı','belirsiz'] },
+                                mold: { 'Kalibrasyon': ['kalıp.*kalibr','ölçü.*kalıp','kalıp.*ölçü'], 'Asinti/Yipranma': ['kalıp.*aşın','aşın.*kalıp','kalıp.*yıpran','kalıp.*ömür'], 'Tasarim': ['kalıp.*tasarım','tasarım.*kalıp','dizayn.*kalıp','form.*kalıp'], 'Bakim': ['kalıp.*bakım','bakım.*kalıp','kalıp.*temiz','kalıp.*onarım'], 'Isi Yonetimi': ['ısı','sıcaklık.*kalıp','soğutma','termal','kalıp.*ısın'], 'Yuzey Durumu': ['yüzey','parlatma','kaplama.*kalıp','kalıp.*yüzey','çizik.*kalıp'] },
+                                environment: { 'Sicaklik': ['sıcaklık','ısı.*ortam','derece','termal.*ortam'], 'Nem': ['nem','humidity','kuru.*ortam','ıslak'], 'Aydinlatma': ['aydınlatma','ışık','karanlık','görüş.*mesafe'], 'Temizlik/5S': ['temizlik','5s','düzen','kirli.*alan','dağınık','tertip'], 'Gurultu/Titresim': ['gürültü','titreşim','ses','vibrasyon'], 'Yerlesim/Ergonomi': ['yerleşim','ergonomi','alan.*dar','konum','mesafe','ulaşım'] }
+                            };
+                            Object.entries(r.d4.fishbone).forEach(([cat, items]) => {
+                                items.forEach(item => {
+                                    if (typeof item === 'object' && item.text?.trim() && !item.subCategory) {
+                                        const txt = item.text.toLowerCase();
+                                        const catKw = subMKeywords[cat];
+                                        if (catKw) {
+                                            for (const [subName, keywords] of Object.entries(catKw)) {
+                                                if (keywords.some(kw => new RegExp(kw, 'i').test(txt))) {
+                                                    item.subCategory = subName;
+                                                    rChanged = true;
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                    }
+                                });
+                            });
+                        }
                     });
                     if (rChanged) localStorage.setItem(key, JSON.stringify(this.reports));
                 } else {
@@ -1089,6 +1129,9 @@
                                     </button>
                                     <button onclick="app.switchCompanyHubTab('operators')" id="ch-tab-operators" class="text-left px-4 py-3 rounded-xl font-bold flex items-center gap-3 text-slate-500 hover:bg-slate-50 transition-all">
                                         <i class="fa-solid fa-id-badge w-5 text-center"></i> Operatör Listesi
+                                    </button>
+                                    <button onclick="app.switchCompanyHubTab('subm')" id="ch-tab-subm" class="text-left px-4 py-3 rounded-xl font-bold flex items-center gap-3 text-slate-500 hover:bg-slate-50 transition-all">
+                                        <i class="fa-solid fa-diagram-project w-5 text-center"></i> 6M Tanimlari
                                     </button>
                                     <button onclick="app.switchCompanyHubTab('processes')" id="ch-tab-processes" class="text-left px-4 py-3 rounded-xl font-bold flex items-center gap-3 text-slate-500 hover:bg-slate-50 transition-all">
                                         <i class="fa-solid fa-network-wired w-5 text-center"></i> Proses Ağacı
@@ -1215,6 +1258,21 @@
                                     <!-- Operator List -->
                                     <div id="ch-operator-list" class="space-y-2">
                                         <!-- Populated via renderOperatorList() -->
+                                    </div>
+                                </div>
+                                <!-- 6M Sub-M Definitions -->
+                                <div id="ch-content-subm" class="ch-content-section hidden space-y-6">
+                                    <div class="flex items-center justify-between border-b border-slate-100 pb-4">
+                                        <div>
+                                            <h3 class="text-2xl font-black text-slate-800">6M Alt Kategori Tanimlari</h3>
+                                            <p class="text-sm text-slate-500 mt-1">Balik kilcigi analizinde kullanilacak alt kategorileri yonetin</p>
+                                        </div>
+                                        <button onclick="app.resetSubMToDefault()" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-2 rounded-lg font-bold transition-all flex items-center gap-2">
+                                            <i class="fa-solid fa-rotate-left"></i> Varsayilana Sifirla
+                                        </button>
+                                    </div>
+                                    <div id="ch-subm-content">
+                                        <!-- Populated via renderSubMTab() -->
                                     </div>
                                 </div>
                                 <!-- Process Tree -->
@@ -1546,7 +1604,7 @@
             },
 
             switchCompanyHubTab(tabName) {
-                ['profile', 'users', 'operators', 'processes', 'memory'].forEach(t => {
+                ['profile', 'users', 'operators', 'subm', 'processes', 'memory'].forEach(t => {
                     const btn = document.getElementById('ch-tab-' + t);
                     if (btn) {
                         btn.className = (t === tabName)
@@ -1580,6 +1638,8 @@
                     this.renderUserList();
                 } else if (tabName === 'operators') {
                     this.renderOperatorList();
+                } else if (tabName === 'subm') {
+                    this.renderSubMTab();
                 } else if (tabName === 'processes') {
                     this.renderProcessCards();
                     this.renderCompanyDefinitions();
@@ -1780,7 +1840,8 @@
                 // Check if editing existing report
                 const editId = this._pendingEditData?.reportId || this.activeReportId;
                 const existingReport = editId ? this.reports.find(r => r.id === editId) : null;
-                if (existingReport && (existingReport.currentStep || 0) < 2) {
+                const existingStartedD2 = existingReport && ((existingReport.d2?.containmentChecks && Object.values(existingReport.d2.containmentChecks).some(v => v)) || (existingReport.d3?.actions && existingReport.d3.actions.some(a => a.action?.trim())));
+                if (existingReport && !existingStartedD2) {
                     // Update existing report
                     existingReport.header.partName = partName;
                     existingReport.header.partNo = partNo;
@@ -1835,7 +1896,7 @@
                     this.activeReportId = id;
                     this.data = report;
                     this.aiPanel = {}; // Reset AI panel state on new report
-                    this.currentStep = report.currentStep || 0;
+                    this.currentStep = Math.min(this._getHighestCompletedStep(), 8);
                     this.renderView();
                     this.renderStepper();
                 }
@@ -1882,6 +1943,35 @@
                     if (!p.whenDate?.trim()) errors.push('"Ne Zaman" için tarih seçin.');
                 }
                 return errors;
+            },
+
+            _isStepStarted(step, reportData) {
+                const d = reportData || this.data;
+                if (!d) return false;
+                switch (step) {
+                    case 0: return (d.team && d.team.length > 0) || d.header?.partName || d.header?.reportNo;
+                    case 1: return d.problem?.what || d.problem?.where || d.problem?.whenDate;
+                    case 2: return (d.d2?.containmentChecks && Object.values(d.d2.containmentChecks).some(v => v)) || (d.d3?.actions && d.d3.actions.some(a => a.action?.trim()));
+                    case 3: return Object.values(d.d4?.fishbone || {}).some(arr => arr.length > 0);
+                    case 4: return (d.d4?.rootCausesOccurrence?.length > 0) || (d.d4?.rootCausesDetection?.length > 0);
+                    case 5: return (d.d5?.occurrenceActions?.some(a => a.action?.trim())) || (d.d5?.detectionActions?.some(a => a.action?.trim()));
+                    case 6: return d.d5?.occurrenceActions?.some(a => a.status === 'Kapatıldı' || a.status === 'Yapıldı' || a.status === 'Tamamlandı') || d.d5?.detectionActions?.some(a => a.status === 'Kapatıldı' || a.status === 'Yapıldı' || a.status === 'Tamamlandı');
+                    case 7: return d.d7?.docs?.some(doc => doc.checked) || d.d7?.deploymentText?.trim() || d.d7?.standardization?.some(s => s.action?.trim());
+                    case 8: return d.details?.status?.code === 'Kapatıldı';
+                    default: return false;
+                }
+            },
+
+            _getHighestCompletedStep(reportData) {
+                let highest = 0;
+                for (let i = 0; i <= 8; i++) {
+                    if (this._isStepStarted(i, reportData)) {
+                        highest = i + 1;
+                    } else {
+                        break;
+                    }
+                }
+                return Math.min(highest, 8);
             },
 
             toggleContainmentCheck(key) {
@@ -1990,11 +2080,6 @@
                     }
 
                     try {
-                        // Sadece ileri gidildiğinde rapor ilerlemesini güncelle
-                        if (stepIndex > (this.data.currentStep || 0)) {
-                            this.data.currentStep = stepIndex;
-                            this.saveToStorage();
-                        }
                         this.currentStep = stepIndex;
                         window.scrollTo(0, 0);
 
@@ -2056,7 +2141,7 @@
                     { label: "D0", title: "Detay", icon: "fa-users" },
                     { label: "D1", title: "5N1K", icon: "fa-magnifying-glass" },
                     { label: "D2", title: "Acil Eylem", icon: "fa-shield-halved" },
-                    { label: "D3", title: "Kılçık", icon: "fa-fish-fins" },
+                    { label: "D3", title: "Balıkkılçığı", icon: "fa-fish-fins" },
                     { label: "D4", title: "5 Neden", icon: "fa-tree" },
                     { label: "D5", title: "Aksiyon", icon: "fa-list-check" },
                     { label: "D6", title: "Doğrulama", icon: "fa-clipboard-check" },
@@ -2074,7 +2159,7 @@
                     container.classList.remove('hidden');
                 }
 
-                const realStep = this.data?.currentStep || 0;
+                const realStep = this._getHighestCompletedStep();
                 const progressPct = Math.min(Math.max(((realStep) / (steps.length - 1)) * 100, 0), 100);
 
                 let html = `
@@ -2598,10 +2683,10 @@
                     });
                 }
 
-                const openCount = visibleReports.filter(r => r.currentStep < 8).length;
+                const openCount = visibleReports.filter(r => this._getHighestCompletedStep(r) < 8).length;
                 const overdueCount = visibleReports.filter(r => {
                     const td = new Date(r.targetDate || '2099-01-01');
-                    return td < new Date() && r.currentStep < 8;
+                    return td < new Date() && this._getHighestCompletedStep(r) < 8;
                 }).length;
                 const greetName = user ? user.name.split(' ')[0] : '';
                 const companyName = company ? company.name : '';
@@ -2687,10 +2772,11 @@
                     } else {
                         visibleReports.forEach(report => {
                             const isInternal = report.type === 'internal';
-                            const progress = Math.round((report.currentStep / 8) * 100);
+                            const reportStep = this._getHighestCompletedStep(report);
+                            const progress = Math.round((reportStep / 8) * 100);
                             const targetDateStr = report.targetDate || new Date().toISOString().split('T')[0];
                             const targetDate = new Date(targetDateStr);
-                            const isOverdue = targetDate < new Date() && report.currentStep < 8;
+                            const isOverdue = targetDate < new Date() && reportStep < 8;
 
                             html += `
                                 <tr class="hover:bg-slate-50/80 transition-colors duration-150 group border-b border-slate-50 last:border-0">
@@ -2718,7 +2804,7 @@
                                     </td>
                                     <td class="px-6 py-4">
                                         <div class="w-full px-2">
-                                            ${report.currentStep >= 8
+                                            ${(() => { const rStep = this._getHighestCompletedStep(report); return rStep >= 8
                                     ? `<div class="flex items-center justify-center">
                                                     <span class="px-3 py-1.5 rounded-lg bg-gradient-to-r from-green-500 to-emerald-600 text-white font-black text-xs tracking-wide shadow-lg shadow-green-500/30 flex items-center gap-1.5">
                                                         <i class="fa-solid fa-check-circle"></i> TAMAMLANDI
@@ -2726,15 +2812,15 @@
                                                    </div>`
                                     : `<div class="relative h-8 flex items-center">
                                                     <div class="absolute top-1/2 -translate-y-1/2 w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                                                        <div class="h-full ${isInternal ? 'bg-gradient-to-r from-blue-400 to-blue-500' : 'bg-gradient-to-r from-slate-500 to-slate-600'} rounded-full transition-all duration-700" style="width: ${(report.currentStep / 8) * 100}%"></div>
+                                                        <div class="h-full ${isInternal ? 'bg-gradient-to-r from-blue-400 to-blue-500' : 'bg-gradient-to-r from-slate-500 to-slate-600'} rounded-full transition-all duration-700" style="width: ${(rStep / 8) * 100}%"></div>
                                                     </div>
-                                                    <div class="relative w-full flex" style="padding-left: calc(${Math.max(0, (report.currentStep / 8) * 100 - 10)}%)">
+                                                    <div class="relative w-full flex" style="padding-left: calc(${Math.max(0, (rStep / 8) * 100 - 10)}%)">
                                                         <span class="px-2.5 py-1 rounded-lg ${isInternal ? 'bg-gradient-to-r from-blue-500 to-indigo-600 shadow-lg shadow-blue-500/40' : 'bg-gradient-to-r from-slate-600 to-slate-800 shadow-lg shadow-slate-600/40'} text-white font-black text-xs tracking-wide whitespace-nowrap">
-                                                            D${report.currentStep}
+                                                            D${rStep}
                                                         </span>
                                                     </div>
-                                                   </div>`
-                                }
+                                                   </div>`;
+                                })()}
                                         </div>
                                     </td>
                                     <td class="px-6 py-4">
@@ -2951,6 +3037,7 @@
                     setTimeout(() => {
                         this.renderAnalyticsChart();
                         this.renderParetoChart();
+                        this.renderSubMParetoChart(this._selectedMForSubM || 'man');
                         this.renderTypeDistributionChart();
                         this.renderProcessParetoChart();
                         this.renderCustomerParetoChart();
@@ -3220,7 +3307,7 @@
 
                 <!-- Geri Dönüş Butonu -->
                 <div class="flex flex-col items-center mt-6 gap-2">
-                    ${(this.data.currentStep || 0) >= 2 ? `
+                    ${this._getHighestCompletedStep() >= 2 ? `
                         <button disabled class="flex items-center gap-2 text-slate-300 font-bold text-xs uppercase tracking-widest border border-slate-100 px-6 py-3 rounded-xl bg-slate-50 cursor-not-allowed">
                             <i class="fa-solid fa-pen-to-square text-[10px]"></i>
                             <span>Giriş Bilgilerini Düzenle</span>
@@ -3719,6 +3806,22 @@
             renderD3(container) {
                 const d4 = this.data.d4;
                 const labels = { machine: 'Makine', material: 'Malzeme', method: 'Metot', man: 'İnsan', mold: 'Kalıp', environment: 'Çevre' };
+                const subM = this.getSubMCategories();
+
+                const renderSubMSelect = (cat, idx, currentSub) => {
+                    const subs = subM[cat] || [];
+                    if (subs.length === 0) return '';
+                    return `<select onchange="app.updateFishboneSubCategory('${cat}', ${idx}, this.value)" class="text-[8px] px-1.5 py-0.5 rounded-md bg-violet-50 text-violet-600 border border-violet-200 font-bold outline-none cursor-pointer">
+                        <option value="">Alt-M sec...</option>
+                        ${subs.map(s => `<option value="${s}" ${currentSub === s ? 'selected' : ''}>${s}</option>`).join('')}
+                    </select>`;
+                };
+
+                const renderSubMChips = (cat) => {
+                    const subs = subM[cat] || [];
+                    if (subs.length === 0) return '';
+                    return `<div class="flex flex-wrap gap-1 mb-2 px-1">${subs.map(s => `<span class="text-[7px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-400 font-bold">${s}</span>`).join('')}</div>`;
+                };
 
                 container.innerHTML = `
             <div class="glass-panel p-8 animate-fade-in max-w-6xl mx-auto">
@@ -3762,12 +3865,14 @@
                         <!-- TOP ROW -->
                         ${['material', 'machine', 'method'].map(cat => `
                             <div class="flex flex-col items-center">
-                                <div class="bg-slate-800 text-white px-6 py-2 rounded-lg font-black text-xs uppercase tracking-widest mb-4 shadow-lg">${labels[cat]}</div>
+                                <div class="bg-slate-800 text-white px-6 py-2 rounded-lg font-black text-xs uppercase tracking-widest mb-2 shadow-lg">${labels[cat]}</div>
+                                ${renderSubMChips(cat)}
                                 <div class="w-full space-y-3 px-4">
                                     ${d4.fishbone[cat].map((item, idx) => {
                     const val = typeof item === 'string' ? item : item.text;
                     const status = typeof item === 'string' ? 'araştırılıyor' : item.status;
                     const type = typeof item === 'string' ? 'occurrence' : item.type;
+                    const currentSub = typeof item === 'object' ? (item.subCategory || '') : '';
                     const colorBorder = type === 'occurrence' ? 'border-orange-200' : 'border-blue-200';
                     const aiSourceBadge = (typeof item === 'object' && item.aiSource) ? '<span class="text-[8px] font-black bg-blue-50 text-blue-400 border border-blue-100 px-1 py-0.5 rounded-full select-none">🤖</span>' : '';
 
@@ -3791,6 +3896,7 @@
                                                     oninput="this.style.height = ''; this.style.height = this.scrollHeight + 'px'">${val}</textarea>
 
                                                 <div class="flex items-center gap-1 mt-2 pt-2 border-t border-slate-50 flex-wrap">
+                                                    ${renderSubMSelect(cat, idx, currentSub)}
                                                     <button onclick="app.setFishboneStatus('${cat}', ${idx}, 'onaylandı')" class="text-[9px] px-2 py-0.5 rounded-md border font-bold transition-all ${status === 'onaylandı' ? 'bg-green-500 text-white border-green-500' : 'bg-white text-green-600 border-green-200 hover:bg-green-50'}" title="Onayla">✓ Onayla</button>
                                                     <button onclick="app.setFishboneStatus('${cat}', ${idx}, 'elendi')" class="text-[9px] px-2 py-0.5 rounded-md border font-bold transition-all ${status === 'elendi' ? 'bg-red-500 text-white border-red-500' : 'bg-white text-red-500 border-red-200 hover:bg-red-50'}" title="Reddet">✗ Reddet</button>
                                                     <button onclick="app.toggleFishboneType('${cat}', ${idx})" class="text-[9px] px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-500 hover:bg-slate-200 border border-slate-200 shadow-sm" title="Oluşum/Kaçış Değiştir">${type === 'occurrence' ? 'Oluşum' : 'Kaçış'}</button>
@@ -3821,6 +3927,7 @@
                     const val = typeof item === 'string' ? item : item.text;
                     const status = typeof item === 'string' ? 'araştırılıyor' : item.status;
                     const type = typeof item === 'string' ? 'occurrence' : item.type;
+                    const currentSub = typeof item === 'object' ? (item.subCategory || '') : '';
                     const colorBorder = type === 'occurrence' ? 'border-orange-200' : 'border-blue-200';
                     const aiSourceBadge = (typeof item === 'object' && item.aiSource) ? '<span class="text-[8px] font-black bg-blue-50 text-blue-400 border border-blue-100 px-1 py-0.5 rounded-full select-none">🤖</span>' : '';
 
@@ -3844,6 +3951,7 @@
                                                     oninput="this.style.height = ''; this.style.height = this.scrollHeight + 'px'">${val}</textarea>
 
                                                 <div class="flex items-center gap-1 mt-2 pt-2 border-t border-slate-50 flex-wrap">
+                                                    ${renderSubMSelect(cat, idx, currentSub)}
                                                     <button onclick="app.setFishboneStatus('${cat}', ${idx}, 'onaylandı')" class="text-[9px] px-2 py-0.5 rounded-md border font-bold transition-all ${status === 'onaylandı' ? 'bg-green-500 text-white border-green-500' : 'bg-white text-green-600 border-green-200 hover:bg-green-50'}" title="Onayla">✓ Onayla</button>
                                                     <button onclick="app.setFishboneStatus('${cat}', ${idx}, 'elendi')" class="text-[9px] px-2 py-0.5 rounded-md border font-bold transition-all ${status === 'elendi' ? 'bg-red-500 text-white border-red-500' : 'bg-white text-red-500 border-red-200 hover:bg-red-50'}" title="Reddet">✗ Reddet</button>
                                                     <button onclick="app.toggleFishboneType('${cat}', ${idx})" class="text-[9px] px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-500 hover:bg-slate-200 border border-slate-200 shadow-sm" title="Oluşum/Kaçış Değiştir">${type === 'occurrence' ? 'Oluşum' : 'Kaçış'}</button>
@@ -3854,6 +3962,7 @@
                                         `;
                 }).join('')}
                                 </div>
+                                ${renderSubMChips(cat)}
                                 <div class="bg-slate-800 text-white px-6 py-2 rounded-lg font-black text-xs uppercase tracking-widest mt-auto shadow-lg">${labels[cat]}</div>
                             </div>
                         `).join('')}
@@ -5223,9 +5332,11 @@
                                 textStyle = 'text-slate-400 font-medium italic';
                             }
 
+                            const subCat = (typeof it === 'object' && it.subCategory) ? `<span class="inline-block bg-violet-100 text-violet-600 text-[5px] font-bold px-1 py-0 rounded ml-1">${it.subCategory}</span>` : '';
+
                             return `
                                         <div class="flex items-start gap-1 bg-white/95 border border-slate-200 p-1 rounded shadow-sm">
-                                            <div class="text-[7px] leading-tight flex-1 ${textStyle}"> - ${String(val).trim() || '-'} ${statusMarkup}</div>
+                                            <div class="text-[7px] leading-tight flex-1 ${textStyle}"> - ${String(val).trim() || '-'} ${subCat} ${statusMarkup}</div>
                                         </div>
                                         `;
                         }).join('') : ''}
@@ -5945,7 +6056,9 @@
                 const ctx = document.getElementById('rcChart');
                 if (!ctx) return;
 
-                const counts = { machine: 0, material: 0, method: 0, man: 0, mold: 0, environment: 0, other: 0 };
+                const catKeys = ['machine', 'material', 'method', 'man', 'mold', 'environment', 'other'];
+                const counts = {};
+                catKeys.forEach(k => counts[k] = 0);
 
                 const processReport = (report) => {
                     const rc1 = report.d4?.rootCausesOccurrence || [];
@@ -5973,19 +6086,36 @@
                 }
 
                 const labelsMap = { machine: 'Makine', material: 'Malzeme', method: 'Metot', man: 'İnsan', mold: 'Kalıp', environment: 'Çevre', other: 'Diğer' };
+                const colorMap = { machine: '#3b82f6', material: '#f59e0b', method: '#22c55e', man: '#ef4444', mold: '#8b5cf6', environment: '#64748b', other: '#cbd5e1' };
                 const dataLabels = [];
                 const dataValues = [];
-                Object.keys(counts).forEach(k => {
+                const bgColors = [];
+                const clickKeys = [];
+                catKeys.forEach(k => {
                     if (counts[k] > 0) {
                         dataLabels.push(labelsMap[k] || k);
                         dataValues.push(counts[k]);
+                        bgColors.push(colorMap[k]);
+                        clickKeys.push(k);
                     }
                 });
 
                 if (dataValues.length === 0) {
                     dataLabels.push('Henüz Analiz Yok');
                     dataValues.push(1);
+                    bgColors.push('#e2e8f0');
+                    clickKeys.push(null);
                 }
+
+                const self = this;
+                const selectedM = this._selectedMForSubM || null;
+                const selectedIdx = selectedM ? clickKeys.indexOf(selectedM) : -1;
+                const total = dataValues.reduce((a, b) => a + b, 0);
+
+                // Seçili dilim dışarı çıkar, renklere dokunulmaz
+                const activeOffsets = bgColors.map((_, i) => (selectedIdx !== -1 && i === selectedIdx) ? 14 : 0);
+                const activeBorderWidths = bgColors.map((_, i) => (selectedIdx !== -1 && i === selectedIdx) ? 4 : 2);
+                const activeBorderColors = bgColors.map((c, i) => (selectedIdx !== -1 && i === selectedIdx) ? c : '#ffffff');
 
                 this._rcChartInstance = new Chart(ctx, {
                     type: 'doughnut',
@@ -5993,18 +6123,236 @@
                         labels: dataLabels,
                         datasets: [{
                             data: dataValues,
-                            backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#64748b', '#e2e8f0'],
-                            borderWidth: 2,
-                            borderColor: '#ffffff',
-                            hoverOffset: 4
+                            backgroundColor: bgColors,
+                            borderWidth: activeBorderWidths,
+                            borderColor: activeBorderColors,
+                            hoverOffset: 10,
+                            offset: activeOffsets
                         }]
                     },
                     options: {
+                        responsive: true,
+                        maintainAspectRatio: true,
                         plugins: {
-                            legend: { position: 'bottom', labels: { font: { family: "'Inter', sans-serif", size: 10, weight: 'bold' } } }
+                            legend: {
+                                position: 'bottom',
+                                labels: {
+                                    font: { family: "'Inter', sans-serif", size: 11, weight: 'bold' },
+                                    padding: 16,
+                                    usePointStyle: true,
+                                    pointStyle: 'rectRounded',
+                                    generateLabels: function(chart) {
+                                        const ds = chart.data.datasets[0];
+                                        return chart.data.labels.map((label, i) => ({
+                                            text: label,
+                                            fillStyle: ds.backgroundColor[i],
+                                            strokeStyle: ds.backgroundColor[i],
+                                            lineWidth: 0,
+                                            hidden: false,
+                                            index: i,
+                                            fontColor: (selectedIdx !== -1 && i === selectedIdx) ? '#1e293b' : '#64748b'
+                                        }));
+                                    }
+                                }
+                            },
+                            tooltip: {
+                                backgroundColor: 'rgba(15,23,42,0.9)',
+                                titleFont: { family: "'Inter', sans-serif", size: 12, weight: 'bold' },
+                                bodyFont: { family: "'Inter', sans-serif", size: 11 },
+                                padding: 12,
+                                cornerRadius: 10,
+                                callbacks: {
+                                    label: function(context) {
+                                        const pct = total > 0 ? Math.round((context.raw / total) * 100) : 0;
+                                        return ` ${context.raw} adet  ·  %${pct}`;
+                                    }
+                                }
+                            }
                         },
-                        cutout: '65%',
-                        animation: { animateScale: true, animateRotate: true }
+                        cutout: '58%',
+                        animation: { animateScale: true, animateRotate: true, duration: 600 },
+                        onClick(evt, elements) {
+                            if (elements.length > 0 && clickKeys[elements[0].index] && clickKeys[elements[0].index] !== 'other') {
+                                self._selectedMForSubM = clickKeys[elements[0].index];
+                                self.renderSubMParetoChart(self._selectedMForSubM);
+                                self.renderAnalyticsChart();
+                            }
+                        }
+                    },
+                    plugins: [{
+                        id: 'doughnutPercentLabels',
+                        afterDraw(chart) {
+                            const { ctx: c, data } = chart;
+                            const t = data.datasets[0].data.reduce((a, b) => a + b, 0);
+                            if (t === 0) return;
+                            chart.getDatasetMeta(0).data.forEach((arc, i) => {
+                                const pct = Math.round((data.datasets[0].data[i] / t) * 100);
+                                if (pct < 6) return;
+                                const { x, y } = arc.tooltipPosition();
+                                c.save();
+                                c.font = 'bold 12px Inter, sans-serif';
+                                c.fillStyle = '#ffffff';
+                                c.textAlign = 'center';
+                                c.textBaseline = 'middle';
+                                c.shadowColor = 'rgba(0,0,0,0.4)';
+                                c.shadowBlur = 4;
+                                c.fillText(`%${pct}`, x, y);
+                                c.restore();
+                            });
+                        }
+                    },
+                    {
+                        id: 'centerLabel',
+                        afterDraw(chart) {
+                            const { ctx: c, chartArea } = chart;
+                            const cx = (chartArea.left + chartArea.right) / 2;
+                            const cy = (chartArea.top + chartArea.bottom) / 2;
+                            c.save();
+                            c.textAlign = 'center';
+                            c.textBaseline = 'middle';
+                            // Toplam sayı
+                            c.font = 'bold 28px Inter, sans-serif';
+                            c.fillStyle = '#1e293b';
+                            c.fillText(total, cx, cy - 8);
+                            // Alt yazı
+                            c.font = '500 10px Inter, sans-serif';
+                            c.fillStyle = '#94a3b8';
+                            c.fillText('TOPLAM', cx, cy + 14);
+                            c.restore();
+                        }
+                    }]
+                });
+            },
+
+
+
+
+            renderSubMParetoChart(mKey) {
+                const prevM = this._selectedMForSubM;
+                this._selectedMForSubM = mKey || 'man';
+                const ctx = document.getElementById('subMParetoChart');
+                if (!ctx) return;
+
+                // Doughnut'ı seçimle güncelle (eğer farklı M seçildiyse)
+                if (prevM !== this._selectedMForSubM) {
+                    this.renderAnalyticsChart();
+                }
+
+                // M butonlarını güncelle
+                const selector = document.getElementById('subm-selector');
+                if (selector) {
+                    const mLabels = { man: 'İnsan', machine: 'Makine', material: 'Malzeme', method: 'Metot', mold: 'Kalıp', environment: 'Çevre' };
+                    const mColors = { man: '#ef4444', machine: '#3b82f6', material: '#f59e0b', method: '#22c55e', mold: '#8b5cf6', environment: '#64748b' };
+                    selector.innerHTML = Object.keys(mLabels).map(k => {
+                        const active = k === this._selectedMForSubM;
+                        return `<button onclick="app.renderSubMParetoChart('${k}')" class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all" style="${active ? `background:${mColors[k]};color:white;box-shadow:0 4px 12px ${mColors[k]}40` : 'background:#f1f5f9;color:#64748b'}">${mLabels[k]}</button>`;
+                    }).join('');
+                }
+
+                // Alt-M sayımı
+                const subCounts = {};
+                const allReports = [...(this._filteredReports || this.reports), ...(this._filteredLLPool || this.lessonsLearnedPool || [])];
+                allReports.forEach(r => {
+                    (r.d4?.fishbone?.[this._selectedMForSubM] || []).forEach(item => {
+                        const txt = typeof item === 'string' ? item : (item.text || '');
+                        if (!txt.trim()) return;
+                        const sub = (typeof item === 'object' ? item.subCategory : '') || 'Tanımsız';
+                        subCounts[sub] = (subCounts[sub] || 0) + 1;
+                    });
+                });
+
+                // Sıralama (büyükten küçüğe)
+                const sorted = Object.entries(subCounts).sort((a, b) => b[1] - a[1]);
+                const labels = sorted.map(s => s[0]);
+                const values = sorted.map(s => s[1]);
+                const total = values.reduce((a, b) => a + b, 0);
+
+                // Kümülatif %
+                const cumPct = [];
+                let cum = 0;
+                values.forEach(v => { cum += v; cumPct.push(total > 0 ? Math.round((cum / total) * 100) : 0); });
+
+                if (this._subMParetoInstance) this._subMParetoInstance.destroy();
+
+                const mColors = { man: '#ef4444', machine: '#3b82f6', material: '#f59e0b', method: '#22c55e', mold: '#8b5cf6', environment: '#64748b' };
+                const barColor = mColors[this._selectedMForSubM] || '#8b5cf6';
+
+                if (labels.length === 0) {
+                    ctx.getContext('2d').clearRect(0, 0, ctx.width, ctx.height);
+                    const noDataDiv = ctx.parentElement;
+                    if (!noDataDiv.querySelector('.no-data-msg')) {
+                        const msg = document.createElement('div');
+                        msg.className = 'no-data-msg text-center text-slate-400 text-sm font-bold py-12';
+                        msg.textContent = 'Bu kategori için veri bulunamadı';
+                        noDataDiv.appendChild(msg);
+                    }
+                    return;
+                }
+                // Varsa eski no-data mesajını kaldır
+                const noDataMsg = ctx.parentElement?.querySelector('.no-data-msg');
+                if (noDataMsg) noDataMsg.remove();
+
+                this._subMParetoInstance = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            {
+                                label: 'Adet',
+                                data: values,
+                                backgroundColor: barColor + 'CC',
+                                borderColor: barColor,
+                                borderWidth: 1,
+                                borderRadius: 4,
+                                yAxisID: 'y',
+                                order: 2
+                            },
+                            {
+                                label: 'Kümülatif %',
+                                data: cumPct,
+                                type: 'line',
+                                borderColor: '#ef4444',
+                                backgroundColor: 'transparent',
+                                borderWidth: 2,
+                                pointRadius: 3,
+                                pointBackgroundColor: '#ef4444',
+                                tension: 0.3,
+                                yAxisID: 'y1',
+                                order: 1
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        if (context.dataset.label === 'Kümülatif %') return `Kümülatif: %${context.raw}`;
+                                        return `${context.raw} adet`;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                ticks: { font: { family: "'Inter', sans-serif", size: 9, weight: 'bold' }, maxRotation: 45 },
+                                grid: { display: false }
+                            },
+                            y: {
+                                beginAtZero: true,
+                                ticks: { stepSize: 1, font: { size: 9 } },
+                                grid: { color: 'rgba(0,0,0,0.04)' }
+                            },
+                            y1: {
+                                position: 'right',
+                                min: 0, max: 100,
+                                ticks: { callback: v => v + '%', font: { size: 9 } },
+                                grid: { display: false }
+                            }
+                        }
                     }
                 });
             },
@@ -6034,7 +6382,7 @@
                         prompt = `
                             Sen bir Kalite Direktörüsün (Quality Director) ve IATF 16949 uzmanısın. Bize üst yönetim (Executive) toplantısında okunacak profesyonel, çarpıcı ve eyleme dönük bir "Yönetici Özeti" hazırla.
                             ${baseContext} Övgüleri ve endişeleri dengeli ver. Maksimum 3 paragraf.
-                            Aktif Raporlar: ${JSON.stringify(reports.map(r => ({ konu: r.header?.problemDesc, ilerleme: 'D' + r.currentStep, lider: r.leader, gecikme: (new Date() > new Date(r.targetDate)) })))}
+                            Aktif Raporlar: ${JSON.stringify(reports.map(r => ({ konu: r.header?.problemDesc, ilerleme: 'D' + this._getHighestCompletedStep(r), lider: r.leader, gecikme: (new Date() > new Date(r.targetDate)) })))}
                             Geçmiş Öğrenilen Dersler: ${JSON.stringify(llPool.slice(0, 5).map(r => r.problem?.what))}
                             ${jsonInstruction}
                         `;
@@ -6248,8 +6596,8 @@
 
                 // --- KPI Hesaplamaları ---
                 const totalReports = reports.length + llPool.length;
-                const openReports = reports.filter(r => r.currentStep < 8).length;
-                const overdueReports = reports.filter(r => r.currentStep < 8 && new Date(r.targetDate) < now).length;
+                const openReports = reports.filter(r => this._getHighestCompletedStep(r) < 8).length;
+                const overdueReports = reports.filter(r => this._getHighestCompletedStep(r) < 8 && new Date(r.targetDate) < now).length;
 
                 // Ortalama kapanış süresi (gün)
                 const closedReports = [...reports.filter(r => r.d8?.completed), ...llPool];
@@ -6372,11 +6720,14 @@
                         </div>
                     </div>
 
-                    <!-- Grafik Satırı: Doughnut + Pareto -->
+                    <!-- 6M Dağılım + Pareto -->
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                        <div class="glass-panel p-6 shadow-xl border-none">
-                            <h3 class="text-lg font-black text-slate-800 tracking-tight italic mb-4"><i class="fa-solid fa-chart-pie text-blue-500 mr-2"></i>6M Kök Neden Dağılımı</h3>
-                            <div class="w-full max-w-sm mx-auto relative aspect-square flex items-center justify-center">
+                        <div class="glass-panel p-6 shadow-xl border-none relative overflow-hidden">
+                            <div class="flex items-center justify-between mb-2">
+                                <h3 class="text-lg font-black text-slate-800 tracking-tight italic"><i class="fa-solid fa-chart-pie text-blue-500 mr-2"></i>6M Dağılım Grafiği</h3>
+                                <span class="text-[9px] text-slate-400 font-medium bg-slate-50 px-2 py-1 rounded-md">Dilime tıkla → Alt-M detayı</span>
+                            </div>
+                            <div class="w-full max-w-[280px] mx-auto relative flex items-center justify-center" style="height: 320px;">
                                 <canvas id="rcChart"></canvas>
                             </div>
                         </div>
@@ -6385,6 +6736,17 @@
                             <div class="w-full relative" style="height: 320px;">
                                 <canvas id="paretoChart"></canvas>
                             </div>
+                        </div>
+                    </div>
+
+                    <!-- Alt-M Pareto Analizi — Full Width -->
+                    <div class="glass-panel p-6 shadow-xl border-none mb-8">
+                        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
+                            <h3 class="text-lg font-black text-slate-800 tracking-tight italic"><i class="fa-solid fa-layer-group text-violet-500 mr-2"></i>Alt-M Detay Pareto Analizi</h3>
+                            <div id="subm-selector" class="flex flex-wrap gap-1.5"></div>
+                        </div>
+                        <div class="w-full relative" style="height: 340px;">
+                            <canvas id="subMParetoChart"></canvas>
                         </div>
                     </div>
 
@@ -7137,7 +7499,7 @@
                                     <div class="min-w-0">
                                         <div class="flex items-center gap-2 mb-1">
                                             ${r.id ? `<button onclick="document.getElementById('analytics-drilldown-modal').remove(); app.load8D('${r.id}')" class="text-xs font-black text-blue-600 hover:underline">${r.id}</button>` : '<span class="text-[10px] font-black px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">Arşiv</span>'}
-                                            <span class="text-xs font-bold text-slate-500">D${r.currentStep || '?'}</span>
+                                            <span class="text-xs font-bold text-slate-500">D${this._getHighestCompletedStep(r) || '?'}</span>
                                         </div>
                                         <p class="text-sm font-bold text-slate-800 truncate">${r.header?.partName || r.problem?.what || '-'}</p>
                                         <p class="text-xs text-slate-400 mt-0.5">${r.header?.problemDesc || ''}</p>
@@ -7184,7 +7546,7 @@
                                     <div class="min-w-0">
                                         <div class="flex items-center gap-2 mb-1">
                                             ${r.id ? `<button onclick="document.getElementById('analytics-drilldown-modal').remove(); app.load8D('${r.id}')" class="text-xs font-black text-orange-600 hover:underline">${r.id}</button>` : '<span class="text-[10px] font-black px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">Arşiv</span>'}
-                                            <span class="text-xs font-bold text-slate-500">D${r.currentStep || '?'}</span>
+                                            <span class="text-xs font-bold text-slate-500">D${this._getHighestCompletedStep(r) || '?'}</span>
                                         </div>
                                         <p class="text-sm font-bold text-slate-800 truncate">${r.header?.partName || r.problem?.what || '-'}</p>
                                         <p class="text-xs text-slate-400 mt-0.5">${r.header?.problemDesc || ''}</p>
@@ -7418,22 +7780,29 @@ Format (JSON):
 
             // --- D3: Balık Kılçığı ---
             _buildD3Prompt() {
+                const subM = this.getSubMCategories();
                 const currentState = Object.keys(this.data.d4.fishbone).map(cat => {
-                    const items = this.data.d4.fishbone[cat].map(i => `${i.text || i} (${(i.type === 'occurrence' ? 'Oluşum' : 'Kaçış')})`).join(', ');
+                    const items = this.data.d4.fishbone[cat].map(i => `${i.text || i} (${(i.type === 'occurrence' ? 'Oluşum' : 'Kaçış')}${i.subCategory ? ' [' + i.subCategory + ']' : ''})`).join(', ');
                     return `${cat.toUpperCase()}: ${items || 'Henüz girilmedi'}`;
                 }).join(' | ');
+                const catLabels = { man: 'İnsan', machine: 'Makine', material: 'Malzeme', method: 'Metot', mold: 'Kalıp', environment: 'Çevre' };
+                const subMInfo = Object.keys(subM).map(cat => `- ${catLabels[cat] || cat}: ${subM[cat].join(', ')}`).join('\n');
                 return `Kıdemli Kalite Mühendisisin. Aşağıdaki problem için 6M Balık Kılçığı analizinde (Machine, Material, Method, Man, Mold, Environment) yeni hipotezler üret.
 
 ÖNEMLİ KURALLAR:
 1. HER KATEGORİ İÇİN: Varsa sadece 1 adet "occurrence" (oluşum) ve 1 adet "detection" (kaçış/tespit) nedeni öner. Toplamda en fazla 12 öneri olabilir.
 2. MEVCUT ANALİZE BAK: Mevcut listede olan nedenleri tekrar önerme.
+3. HER ÖNERİ İÇİN: Aşağıdaki alt kategori listesinden en uygun "subCategory" değerini seç.
+
+ALT KATEGORİLER:
+${subMInfo}
 
 PROBLEM: ${this.data.problem.what}
 DETAY: ${this.data.header.problemDesc}
 MEVCUT DURUM: ${currentState}
 
 Format (JSON):
-{ "suggestions": [{ "category": "machine", "text": "Hata metni", "type": "occurrence" }] }`;
+{ "suggestions": [{ "category": "machine", "text": "Hata metni", "type": "occurrence", "subCategory": "Bakim" }] }`;
             },
             _parseD3Result(result) {
                 if (!result || !result.suggestions) return [];
@@ -7444,8 +7813,8 @@ Format (JSON):
                     .map(s => ({
                         id: 'sug_' + Math.random().toString(36).substr(2, 9),
                         displayText: s.text,
-                        displaySub: `${catLabels[s.category] || s.category} · ${s.type === 'occurrence' ? '🔴 Oluşum' : '🔵 Kaçış'}`,
-                        data: { category: s.category, text: s.text, type: s.type || 'occurrence', status: 'araştırılıyor' }
+                        displaySub: `${catLabels[s.category] || s.category}${s.subCategory ? ' · ' + s.subCategory : ''} · ${s.type === 'occurrence' ? '🔴 Oluşum' : '🔵 Kaçış'}`,
+                        data: { category: s.category, text: s.text, type: s.type || 'occurrence', status: 'araştırılıyor', subCategory: s.subCategory || '' }
                     }));
             },
             _acceptD3Suggestion(suggestion) {
@@ -7461,7 +7830,7 @@ Format (JSON):
                 Object.entries(this.data.d4.fishbone).forEach(([cat, items]) => {
                     items.forEach(item => {
                         if (typeof item === 'object' && item.status === 'onaylandı') {
-                            confirmedCauses.push({ category: cat, text: item.text, type: item.type });
+                            confirmedCauses.push({ category: cat, text: item.text, type: item.type, subCategory: item.subCategory || '' });
                         }
                     });
                 });
@@ -8121,7 +8490,7 @@ LÜTFEN SADECE AŞAĞIDAKİ JSON FORMATINDA YANIT VER:
                 this.saveToStorage();
             },
             addFishboneItem(cat) {
-                this.data.d4.fishbone[cat].push({ text: '', type: 'occurrence' });
+                this.data.d4.fishbone[cat].push({ text: '', type: 'occurrence', subCategory: '' });
                 this.renderView();
             },
 
@@ -8235,6 +8604,107 @@ LÜTFEN SADECE AŞAĞIDAKİ JSON FORMATINDA YANIT VER:
                 this.data.okPartImage = '';
                 this.saveToStorage();
                 this.renderView();
+            },
+
+            getSubMCategories() {
+                const company = this.companies?.find(c => c.id === this.activeCompanyId);
+                return company?.subMCategories || DEFAULT_SUB_M;
+            },
+
+            ensureCompanySubM() {
+                const company = this.companies?.find(c => c.id === this.activeCompanyId);
+                if (!company) return;
+                if (!company.subMCategories) {
+                    company.subMCategories = JSON.parse(JSON.stringify(DEFAULT_SUB_M));
+                    this.saveCompanies();
+                }
+            },
+
+            renderSubMTab() {
+                const container = document.getElementById('ch-subm-content');
+                if (!container) return;
+                const subM = this.getSubMCategories();
+                const labels = { man: 'INSAN (Man)', machine: 'MAKINE (Machine)', material: 'MALZEME (Material)', method: 'METOT (Method)', mold: 'KALIP (Mold)', environment: 'CEVRE (Environment)' };
+                const icons = { man: 'fa-user-hard-hat', machine: 'fa-gears', material: 'fa-cubes', method: 'fa-list-check', mold: 'fa-cube', environment: 'fa-cloud-sun' };
+                const colors = { man: 'blue', machine: 'slate', material: 'amber', method: 'emerald', mold: 'purple', environment: 'teal' };
+
+                container.innerHTML = Object.keys(labels).map(mKey => {
+                    const items = subM[mKey] || [];
+                    const c = colors[mKey];
+                    return `
+                    <div class="bg-${c}-50/50 border border-${c}-200 rounded-xl p-5 mb-4">
+                        <div class="flex items-center gap-2 mb-3">
+                            <i class="fa-solid ${icons[mKey]} text-${c}-600"></i>
+                            <h4 class="font-black text-${c}-800 text-sm">${labels[mKey]}</h4>
+                            <span class="text-xs text-${c}-400 ml-auto">${items.length} alt kategori</span>
+                        </div>
+                        <div class="flex flex-wrap gap-2 mb-3">
+                            ${items.map((item, idx) => `
+                                <span class="inline-flex items-center gap-1.5 bg-white border border-${c}-200 text-${c}-700 px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm">
+                                    ${item}
+                                    <button onclick="app.removeSubM('${mKey}', ${idx})" class="text-${c}-300 hover:text-red-500 transition-colors ml-1">
+                                        <i class="fa-solid fa-xmark text-[10px]"></i>
+                                    </button>
+                                </span>
+                            `).join('')}
+                            ${items.length === 0 ? `<span class="text-xs text-slate-400 italic">Alt kategori tanimlanmamis</span>` : ''}
+                        </div>
+                        <div class="flex gap-2">
+                            <input type="text" id="subm-input-${mKey}" class="flex-grow px-3 py-2 border border-${c}-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-${c}-300 outline-none" placeholder="Yeni alt kategori ekle...">
+                            <button onclick="app.addSubM('${mKey}')" class="bg-${c}-500 hover:bg-${c}-600 text-white px-4 py-2 rounded-lg text-xs font-bold transition-all">Ekle</button>
+                        </div>
+                    </div>`;
+                }).join('');
+            },
+
+            addSubM(mKey) {
+                const input = document.getElementById('subm-input-' + mKey);
+                const value = input?.value?.trim();
+                if (!value) return;
+
+                this.ensureCompanySubM();
+                const company = this.companies.find(c => c.id === this.activeCompanyId);
+                if (!company?.subMCategories?.[mKey]) return;
+
+                if (company.subMCategories[mKey].includes(value)) {
+                    this._showInfoToast('Bu alt kategori zaten mevcut.', 'error');
+                    return;
+                }
+
+                company.subMCategories[mKey].push(value);
+                this.saveCompanies();
+                input.value = '';
+                this.renderSubMTab();
+                this._showInfoToast('Alt kategori eklendi.', 'success');
+            },
+
+            removeSubM(mKey, index) {
+                this.ensureCompanySubM();
+                const company = this.companies.find(c => c.id === this.activeCompanyId);
+                if (!company?.subMCategories?.[mKey]) return;
+
+                company.subMCategories[mKey].splice(index, 1);
+                this.saveCompanies();
+                this.renderSubMTab();
+            },
+
+            resetSubMToDefault() {
+                const company = this.companies.find(c => c.id === this.activeCompanyId);
+                if (!company) return;
+                company.subMCategories = null;
+                this.saveCompanies();
+                this.renderSubMTab();
+                this._showInfoToast('Alt kategoriler varsayilana sifirlandi.', 'success');
+            },
+
+            updateFishboneSubCategory(cat, index, value) {
+                let item = this.data.d4.fishbone[cat][index];
+                if (typeof item === 'string') {
+                    this.data.d4.fishbone[cat][index] = { text: item, type: 'occurrence', status: 'araştırılıyor', subCategory: value };
+                } else {
+                    item.subCategory = value;
+                }
+                this.saveToStorage();
             },
 
             printVisualTrainingForm() {
