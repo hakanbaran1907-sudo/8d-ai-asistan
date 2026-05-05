@@ -4638,8 +4638,12 @@
                         const discoveredRaw = localStorage.getItem('gemini_discovered_models');
                         if (discoveredRaw) {
                             const discovered = JSON.parse(discoveredRaw);
-                            // Sorter: 2.5 > 2.0 > latest > flash
+                            // Sorter: 3.1 > 3.0 > 2.5 > 2.0 > latest > flash
                             const sorted = discovered.sort((a, b) => {
+                                if (a.includes('3.1')) return -1;
+                                if (b.includes('3.1')) return 1;
+                                if (a.includes('3.0')) return -1;
+                                if (b.includes('3.0')) return 1;
                                 if (a.includes('2.5')) return -1;
                                 if (b.includes('2.5')) return 1;
                                 if (a.includes('2.0')) return -1;
@@ -4729,6 +4733,10 @@
                 if (discoveredRaw) {
                     const discovered = JSON.parse(discoveredRaw);
                     const sorted = discovered.sort((a, b) => {
+                        if (a.includes('3.1')) return -1;
+                        if (b.includes('3.1')) return 1;
+                        if (a.includes('3.0')) return -1;
+                        if (b.includes('3.0')) return 1;
                         if (a.includes('2.5')) return -1;
                         if (b.includes('2.5')) return 1;
                         if (a.includes('2.0')) return -1;
@@ -8023,13 +8031,31 @@ Format (JSON):
                     if (!geminiKey) throw new Error("Google Gemini API anahtarı eksik. Ayarlar kısmından ekleyin.");
 
                     // User provided list of available models
-                    const configs = [
+                    let configs = [
                         { v: 'v1beta', m: 'gemini-2.5-flash' },
                         { v: 'v1beta', m: 'gemini-2.0-flash' },
                         { v: 'v1beta', m: 'gemini-2.0-flash-001' },
                         { v: 'v1beta', m: 'gemini-1.5-flash' },
                         { v: 'v1', m: 'gemini-1.5-flash' }
                     ];
+
+                    const discoveredRaw = localStorage.getItem('gemini_discovered_models');
+                    if (discoveredRaw) {
+                        const discovered = JSON.parse(discoveredRaw);
+                        const sorted = discovered.sort((a, b) => {
+                            if (a.includes('3.1')) return -1;
+                            if (b.includes('3.1')) return 1;
+                            if (a.includes('3.0')) return -1;
+                            if (b.includes('3.0')) return 1;
+                            if (a.includes('2.5')) return -1;
+                            if (b.includes('2.5')) return 1;
+                            if (a.includes('2.0')) return -1;
+                            if (b.includes('2.0')) return 1;
+                            return 0;
+                        });
+                        const discoveredConfigs = sorted.map(m => ({ v: 'v1beta', m: m }));
+                        configs = [...discoveredConfigs, ...configs];
+                    }
 
                     let lastErrorMsg = "";
                     for (const config of configs) {
@@ -8042,13 +8068,12 @@ Format (JSON):
                             const data = await response.json();
 
                             if (data.error) {
-                                // If model not found, try next one
-                                if (data.error.message.includes('not found')) {
-                                    console.warn(`Gemini Modeli Bulunamadı: ${config.m}`);
-                                    lastErrorMsg = data.error.message;
-                                    continue;
+                                if (data.error.message.toLowerCase().includes('api key')) {
+                                    throw new Error(data.error.message);
                                 }
-                                throw new Error(data.error.message);
+                                console.warn(`Gemini API Hatası (${config.m}):`, data.error.message);
+                                lastErrorMsg = data.error.message;
+                                continue;
                             }
 
                             if (!data.candidates || !data.candidates[0]) throw new Error("AI yanıt dönmedi.");
@@ -8067,8 +8092,10 @@ Format (JSON):
                         } catch (e) {
                             console.warn(`Gemini Denemesi Başarısız (${config.m}):`, e.message);
                             lastErrorMsg = e.message;
-                            if (e.message.includes('not found')) continue;
-                            throw e; // If it's something else (like API Key error), stop and report
+                            if (e.message.toLowerCase().includes('api key')) {
+                                throw e;
+                            }
+                            continue;
                         }
                     }
                     throw new Error(`Tüm Gemini modelleri denendi ancak hata alındı. Son hata: ${lastErrorMsg}`);
