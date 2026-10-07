@@ -5781,6 +5781,7 @@
                             <tr class="hover:bg-slate-50/50 transition-colors group">
                                 <td class="p-2 align-top">
                                     ${act.aiSource ? '<span class="inline-flex items-center gap-1 text-[8px] font-black bg-blue-50 text-blue-400 border border-blue-100 px-1.5 py-0.5 rounded-full mb-1 select-none">🤖 AI</span><br>' : ''}
+                                    ${act._sourceChainId ? '<span class="inline-flex items-center gap-1 text-[8px] font-black bg-emerald-50 text-emerald-600 border border-emerald-100 px-1.5 py-0.5 rounded-full mb-1 select-none">🌳 D4 Kök Neden</span><br>' : ''}
                                     <textarea class="${act.responsible === currentUserName ? 'member-editable btn-member-action' : ''} w-full bg-slate-50/50 border border-slate-100 p-2 rounded hover:bg-white focus:bg-white focus:ring-4 focus:ring-blue-500/5 outline-none transition-all resize-none whitespace-pre-wrap break-words text-xs leading-relaxed font-medium text-slate-700 overflow-hidden min-h-[60px]"
                                               placeholder="Aksiyon detayı..."
                                               oninput="this.style.height = 'auto'; this.style.height = this.scrollHeight + 'px'"
@@ -8410,8 +8411,29 @@ LÜTFEN SADECE AŞAĞIDAKİ JSON FORMATINDA YANIT VER:
             // Root Cause Manipulation
             // Root Cause Manipulation (Updated for Split)
             updateWhy(type, chainIndex, whyIndex, value) {
-                if (type === 'Occurrence') this.data.d4.rootCausesOccurrence[chainIndex].whys[whyIndex] = value;
-                else this.data.d4.rootCausesDetection[chainIndex].whys[whyIndex] = value;
+                const chain = type === 'Occurrence' ? this.data.d4.rootCausesOccurrence[chainIndex] : this.data.d4.rootCausesDetection[chainIndex];
+                chain.whys[whyIndex] = value;
+
+                // Kök neden (zincirdeki son "neden") belirlendiğinde D5'e otomatik aksiyon satırı eklenir
+                const isRootCauseField = whyIndex === chain.whys.length - 1;
+                if (isRootCauseField && value && value.trim()) {
+                    if (!chain._chainId) chain._chainId = `rc_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+                    const targetKey = type === 'Occurrence' ? 'occurrenceActions' : 'detectionActions';
+                    const target = this.data.d5[targetKey];
+                    const alreadyLinked = target.some(a => a._sourceChainId === chain._chainId);
+                    if (!alreadyLinked) {
+                        target.push({
+                            action: value.trim(),
+                            responsible: '',
+                            department: '',
+                            deadline: '',
+                            status: 'Açık',
+                            category: chain.category,
+                            _sourceChainId: chain._chainId
+                        });
+                    }
+                }
+
                 this.saveToStorage();
             },
             updateRootStatement(type, chainIndex, value) {
