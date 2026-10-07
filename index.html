@@ -8552,10 +8552,22 @@ LÜTFEN SADECE AŞAĞIDAKİ JSON FORMATINDA YANIT VER:
             setFishboneStatus(cat, index, newStatus) {
                 let item = this.data.d4.fishbone[cat][index];
                 if (typeof item === 'string') {
-                    this.data.d4.fishbone[cat][index] = { text: item, type: 'occurrence', status: newStatus };
-                } else {
-                    item.status = (item.status === newStatus) ? 'araştırılıyor' : newStatus;
+                    item = { text: item, type: 'occurrence', status: 'araştırılıyor' };
+                    this.data.d4.fishbone[cat][index] = item;
                 }
+                item.status = (item.status === newStatus) ? 'araştırılıyor' : newStatus;
+
+                // Onaylanan neden otomatik olarak D4 (5 Neden) analiz zincirine eklenir
+                if (newStatus === 'onaylandı' && item.status === 'onaylandı') {
+                    if (!item._fbId) item._fbId = `fb_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+                    const targetKey = item.type === 'detection' ? 'rootCausesDetection' : 'rootCausesOccurrence';
+                    const target = this.data.d4[targetKey];
+                    const alreadyAdded = target.some(rc => rc._sourceFbId === item._fbId);
+                    if (!alreadyAdded) {
+                        target.push({ statement: item.text, whys: ["", "", ""], category: cat, _sourceFbId: item._fbId });
+                    }
+                }
+
                 this.saveToStorage();
                 this.renderView();
             },
