@@ -21,12 +21,16 @@
             container.style.borderBottom = '2px solid #EF4444';
             container.style.fontFamily = 'monospace';
             container.innerHTML = `
+                <button onclick="this.closest('div').remove()" style="position:absolute; top:12px; right:16px; background:none; border:none; font-size:22px; line-height:1; color:#991B1B; cursor:pointer;">&times;</button>
                 <h3 style="font-weight:bold; margin-bottom:10px;">⚠️ Uygulama Hatası (8D Asistan)</h3>
                 <p><strong>Hata:</strong> ${msg}</p>
                 <p><strong>Dosya:</strong> ${url}:${lineNo}</p>
                 <p>Lütfen bu hatayı geliştiriciye iletin.</p>
             `;
             document.body.appendChild(container);
+            setTimeout(function () {
+                if (container.parentNode) container.remove();
+            }, 8000);
 
             // Sentry capture
             if (typeof Sentry !== 'undefined' && Sentry.captureException) {
@@ -630,13 +634,20 @@
         const APP_VERSION = 'beta-0.1.0';
         const BUILD_DATE = '2026-03-03';
 
+        function escapeHtml(str) {
+            if (str == null) return '';
+            const div = document.createElement('div');
+            div.textContent = String(str);
+            return div.innerHTML;
+        }
+
         const DEFAULT_SUB_M = {
-            man:         ['Egitim', 'Beceri/Yetkinlik', 'Dikkat/Yorgunluk', 'Motivasyon', 'Calisma Sekli', 'Fiziksel Durum'],
-            machine:     ['Bakim', 'Asinti/Yipranma', 'Kalibrasyon', 'Yasi/Teknoloji', 'Ayar/Setup', 'Kapasite'],
-            material:    ['Tedarikci Kalitesi', 'Spesifikasyon', 'Depolama', 'Parti Farkliligi', 'Kontaminasyon', 'Raf Omru'],
-            method:      ['Standart Islem/SOP', 'Proses Tasarimi', 'Is Sirasi', 'Parametre', 'Degisiklik Yonetimi', 'Calisma Talimati'],
-            mold:        ['Kalibrasyon', 'Asinti/Yipranma', 'Tasarim', 'Bakim', 'Isi Yonetimi', 'Yuzey Durumu'],
-            environment: ['Sicaklik', 'Nem', 'Aydinlatma', 'Temizlik/5S', 'Gurultu/Titresim', 'Yerlesim/Ergonomi']
+            man:         ['Eğitim', 'Beceri/Yetkinlik', 'Dikkat/Yorgunluk', 'Motivasyon', 'Çalışma Şekli', 'Fiziksel Durum'],
+            machine:     ['Bakım', 'Aşınma/Yıpranma', 'Kalibrasyon', 'Yaşı/Teknoloji', 'Ayar/Setup', 'Kapasite'],
+            material:    ['Tedarikçi Kalitesi', 'Spesifikasyon', 'Depolama', 'Parti Farklılığı', 'Kontaminasyon', 'Raf Ömrü'],
+            method:      ['Standart İşlem/SOP', 'Proses Tasarımı', 'İş Sırası', 'Parametre', 'Değişiklik Yönetimi', 'Çalışma Talimatı'],
+            mold:        ['Kalibrasyon', 'Aşınma/Yıpranma', 'Tasarım', 'Bakım', 'Isı Yönetimi', 'Yüzey Durumu'],
+            environment: ['Sıcaklık', 'Nem', 'Aydınlatma', 'Temizlik/5S', 'Gürültü/Titreşim', 'Yerleşim/Ergonomi']
         };
 
         const app = {
@@ -1082,7 +1093,12 @@
             saveToStorage() {
                 if (!this.activeCompanyId) return;
                 const key = `8d_reports_${this.activeCompanyId}`;
-                localStorage.setItem(key, JSON.stringify(this.reports));
+                try {
+                    localStorage.setItem(key, JSON.stringify(this.reports));
+                } catch (e) {
+                    console.error('saveToStorage failed', e);
+                    this._showInfoToast('Kayıt alanı dolu, son değişiklik kaydedilemedi. Lütfen büyük foto ekli raporları kontrol edin.', 'error');
+                }
             },
 
             // Navigation
@@ -1667,7 +1683,7 @@
                 this.saveCompanies();
                 input.value = '';
                 this.renderOperatorList();
-                this._showInfoToast(`"${name}" operatör listesine eklendi.`);
+                this._showInfoToast(`"${escapeHtml(name)}" operatör listesine eklendi.`);
             },
 
             removeOperator(index) {
@@ -1698,8 +1714,8 @@
                         ${operators.map((op, i) => `
                             <div class="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 group hover:border-blue-200 hover:bg-blue-50/30 transition-all">
                                 <div class="flex items-center gap-3">
-                                    <div class="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center font-black text-sm">${op.charAt(0).toUpperCase()}</div>
-                                    <span class="text-sm font-semibold text-slate-700">${op}</span>
+                                    <div class="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center font-black text-sm">${escapeHtml(op).charAt(0).toUpperCase()}</div>
+                                    <span class="text-sm font-semibold text-slate-700">${escapeHtml(op)}</span>
                                 </div>
                                 <button onclick="app.removeOperator(${i})" class="text-slate-300 hover:text-red-500 w-7 h-7 rounded-lg hover:bg-red-50 flex items-center justify-center transition-all opacity-0 group-hover:opacity-100">
                                     <i class="fa-solid fa-times text-xs"></i>
@@ -1888,6 +1904,9 @@
                 this.saveToStorage();
                 this.hideNew8DModal();
                 this.load8D(report.id);
+                this.currentStep = 0; // Yeni rapor her zaman D0'dan başlar
+                this.renderView();
+                this.renderStepper();
             },
 
             load8D(id) {
@@ -1949,15 +1968,15 @@
                 const d = reportData || this.data;
                 if (!d) return false;
                 switch (step) {
-                    case 0: return (d.team && d.team.length > 0) || d.header?.partName || d.header?.reportNo;
-                    case 1: return d.problem?.what || d.problem?.where || d.problem?.whenDate;
+                    case 0: return (d.team && d.team.length > 0);
+                    case 1: return !!(d.problem?.where || d.problem?.whenDate || d.problem?.when || d.problem?.who || d.problem?.whoMade || d.problem?.whoCaught || d.problem?.why || d.problem?.how || d.problem?.whenTime || d.problem?.whenShift);
                     case 2: return (d.d2?.containmentChecks && Object.values(d.d2.containmentChecks).some(v => v)) || (d.d3?.actions && d.d3.actions.some(a => a.action?.trim()));
                     case 3: return Object.values(d.d4?.fishbone || {}).some(arr => arr.length > 0);
                     case 4: return (d.d4?.rootCausesOccurrence?.length > 0) || (d.d4?.rootCausesDetection?.length > 0);
                     case 5: return (d.d5?.occurrenceActions?.some(a => a.action?.trim())) || (d.d5?.detectionActions?.some(a => a.action?.trim()));
                     case 6: return d.d5?.occurrenceActions?.some(a => a.status === 'Kapatıldı' || a.status === 'Yapıldı' || a.status === 'Tamamlandı') || d.d5?.detectionActions?.some(a => a.status === 'Kapatıldı' || a.status === 'Yapıldı' || a.status === 'Tamamlandı');
                     case 7: return d.d7?.docs?.some(doc => doc.checked) || d.d7?.deploymentText?.trim() || d.d7?.standardization?.some(s => s.action?.trim());
-                    case 8: return d.details?.status?.code === 'Kapatıldı';
+                    case 8: return !!d.d8?.completed;
                     default: return false;
                 }
             },
@@ -8502,7 +8521,7 @@ LÜTFEN SADECE AŞAĞIDAKİ JSON FORMATINDA YANIT VER:
 
                 // Re-render to update dropdown
                 this.renderView();
-                this._showInfoToast(`"${name}" operatör listesine eklendi ve seçildi.`);
+                this._showInfoToast(`"${escapeHtml(name)}" operatör listesine eklendi ve seçildi.`);
             },
 
             // Fishbone Manipulation
@@ -8586,6 +8605,7 @@ LÜTFEN SADECE AŞAĞIDAKİ JSON FORMATINDA YANIT VER:
                     };
                     img.src = e.target.result;
                 };
+                reader.onerror = () => this._showInfoToast('Dosya okunamadı. Lütfen başka bir dosya deneyin.', 'error');
                 reader.readAsDataURL(file);
             },
 
@@ -8622,6 +8642,7 @@ LÜTFEN SADECE AŞAĞIDAKİ JSON FORMATINDA YANIT VER:
                     };
                     img.src = e.target.result;
                 };
+                reader.onerror = () => this._showInfoToast('Dosya okunamadı. Lütfen başka bir dosya deneyin.', 'error');
                 reader.readAsDataURL(file);
             },
 
@@ -8895,6 +8916,7 @@ td { padding: 3px 6px; border: 1px solid #d1d5db; }
                     };
                     img.src = e.target.result;
                 };
+                reader.onerror = () => this._showInfoToast('Dosya okunamadı. Lütfen başka bir dosya deneyin.', 'error');
                 reader.readAsDataURL(file);
             },
 
@@ -9133,6 +9155,7 @@ td { padding: 3px 6px; border: 1px solid #d1d5db; }
                         console.error(err);
                     }
                 };
+                reader.onerror = () => this._showInfoToast('Dosya okunamadı. Lütfen başka bir dosya deneyin.', 'error');
                 reader.readAsText(file);
             },
 
@@ -9227,6 +9250,7 @@ td { padding: 3px 6px; border: 1px solid #d1d5db; }
                     };
                     img.src = e.target.result;
                 };
+                reader.onerror = () => this._showInfoToast('Dosya okunamadı. Lütfen başka bir dosya deneyin.', 'error');
                 reader.readAsDataURL(file);
             },
 
@@ -9629,6 +9653,7 @@ td { padding: 3px 6px; border: 1px solid #d1d5db; }
                         const summaryEl = document.getElementById('doc-summary-input');
                         if (summaryEl) summaryEl.value = e.target.result.substring(0, 2000);
                     };
+                    reader.onerror = () => this._showInfoToast('Dosya okunamadı. Lütfen başka bir dosya deneyin.', 'error');
                     reader.readAsText(file, 'UTF-8');
                 }
             },
@@ -9720,6 +9745,7 @@ td { padding: 3px 6px; border: 1px solid #d1d5db; }
                         this._showInfoToast('Excel dosyası okunamadı: ' + err.message, 'red');
                     }
                 };
+                reader.onerror = () => this._showInfoToast('Dosya okunamadı. Lütfen başka bir dosya deneyin.', 'error');
                 reader.readAsArrayBuffer(file);
             },
 
@@ -10197,6 +10223,7 @@ td { padding: 3px 6px; border: 1px solid #d1d5db; }
                         this._showInfoToast('Excel dosyası okunamadı: ' + err.message, 'red');
                     }
                 };
+                reader.onerror = () => this._showInfoToast('Dosya okunamadı. Lütfen başka bir dosya deneyin.', 'error');
                 reader.readAsArrayBuffer(file);
             },
 
@@ -10508,6 +10535,7 @@ td { padding: 3px 6px; border: 1px solid #d1d5db; }
                             this._showInfoToast('Excel dosyası okunamadı: ' + err.message, 'red');
                         }
                     };
+                    reader.onerror = () => this._showInfoToast('Dosya okunamadı. Lütfen başka bir dosya deneyin.', 'error');
                     reader.readAsArrayBuffer(file);
                 }
             },
@@ -11027,8 +11055,8 @@ td { padding: 3px 6px; border: 1px solid #d1d5db; }
                 banner.innerHTML = `
                     <i class="fa-solid fa-arrow-up-from-bracket"></i>
                     <div>
-                        <p class="font-bold text-sm">Güncelleme Mevcut: v${newVersion}</p>
-                        ${message ? `<p class="text-xs text-blue-200 mt-0.5">${message}</p>` : ''}
+                        <p class="font-bold text-sm">Güncelleme Mevcut: v${escapeHtml(newVersion)}</p>
+                        ${message ? `<p class="text-xs text-blue-200 mt-0.5">${escapeHtml(message)}</p>` : ''}
                     </div>
                     <button onclick="window.location.reload(true)"
                         class="bg-white text-blue-600 font-bold text-xs px-3 py-1.5 rounded-lg hover:bg-blue-50 transition-colors ml-2 whitespace-nowrap">
